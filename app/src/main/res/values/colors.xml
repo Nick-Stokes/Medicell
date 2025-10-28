@@ -8,6 +8,13 @@
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
 
-
+    <color name="baseMint">#D9E4DD</color>
+    <color name="baseBeige">#FBF7F0</color>
+    <color name="baseGray">#CDC9C3</color>
+    <color name="baseDarkgray">#555555</color>
+    <color name="pointBlue">#3D74B6</color>
+    <color name="pointBeige">#FBF5DE</color>
+    <color name="pointOrange">#EAC8A6</color>
+    <color name="pointRed">#DC3C22</color>
 
 </resources>
