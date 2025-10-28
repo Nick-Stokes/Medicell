@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/main"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".threeButton"
+    android:background="@color/baseBeige">
+    <LinearLayout
+        android:id="@+id/button_group"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <Button
+            android:id="@+id/btn_one"
+            android:layout_width="320dp"
+            android:layout_height="200dp"
+            android:backgroundTint="@color/white"
+            android:background="@drawable/rounded_button"
+            android:textSize="30dp"
+            android:text="복용 알약 리스트" />
+
+        <Button
+            android:id="@+id/btn_two"
+            android:layout_width="320dp"
+            android:layout_height="200dp"
+            android:backgroundTint="@color/white"
+            android:background="@drawable/rounded_button"
+            android:text="알약 이미지 검색"
+            android:textSize="30dp"
+            android:layout_marginTop="16dp" />
+
+        <Button
+            android:id="@+id/btn_three"
+            android:layout_width="320dp"
+            android:layout_height="200dp"
+            android:backgroundTint="@color/white"
+            android:background="@drawable/rounded_button"
+            android:text="알약 알림 설정"
+            android:textSize="30dp"
+            android:layout_marginTop="16dp" />
+
+    </LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>
