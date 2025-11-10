@@ -4,6 +4,8 @@
     
     <!-- 추가한 부분 -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Android 13+ 알림 권한 -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <uses-permission
         android:name="android.permission.CAMERA"
@@ -17,6 +19,15 @@
         <!-- 추가한 부분 -->
         <activity android:name=".list.ui.PillListActivity" />
         <activity android:name=".list.ui.AddPillActivity" />
+
+        <!-- 알림 화면 등록 -->
+        <activity android:name=".alarm.ui.AlarmListActivity" />
+        <activity android:name=".alarm.ui.AddAlarmActivity" />
+
+        <!-- 알림 수신 리시버 -->
+        <receiver
+        android:name=".alarm.AlarmReceiver"
+        android:exported="false" />
 
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
