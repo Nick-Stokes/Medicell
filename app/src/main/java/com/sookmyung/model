@@ -9,4 +9,3 @@ public class Pill {
         this.className = className; this.drugShape = drugShape; this.color1 = color1;
     }
 }
-
