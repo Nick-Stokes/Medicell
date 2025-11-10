@@ -29,6 +29,9 @@ import java.util.Locale;
 
 import androidx.core.app.ActivityOptionsCompat;
 
+// 추가한 부분
+import com.sookmyung.list.ui.PillListActivity;
+
 public class threeButton extends AppCompatActivity {
 
     private static final int REQ_PERM = 2001;
@@ -52,6 +55,12 @@ public class threeButton extends AppCompatActivity {
         Button BtnCamera = findViewById(R.id.btn_search);
         Button BtnAlarm = findViewById(R.id.btn_alarm);
 
+        //추가한 부분
+        BtnList.setOnClickListener(v -> {
+            Intent intent = new Intent(this, PillListActivity.class);
+            startActivity(intent);
+        });
+        
         BtnCamera.setOnClickListener(v ->{
             Intent i = new Intent(threeButton.this, SquareCamera.class);
             startActivity(i);
