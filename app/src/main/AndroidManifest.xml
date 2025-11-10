@@ -2,7 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
     
-    // 추가한 부분
+    <!-- 추가한 부분 -->
     <uses-permission android:name="android.permission.INTERNET"/>
 
     <uses-permission
@@ -14,7 +14,7 @@
         android:required="true" />
 
     <application
-        // 추가한 부분
+        <!-- 추가한 부분 -->
         <activity android:name=".list.ui.PillListActivity" />
         <activity android:name=".list.ui.AddPillActivity" />
 
