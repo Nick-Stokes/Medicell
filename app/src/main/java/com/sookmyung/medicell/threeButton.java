@@ -55,7 +55,7 @@ public class threeButton extends AppCompatActivity {
         Button BtnCamera = findViewById(R.id.btn_search);
         Button BtnAlarm = findViewById(R.id.btn_alarm);
 
-        //추가한 부분
+        // 내 알약 리스트 버튼
         BtnList.setOnClickListener(v -> {
             Intent intent = new Intent(this, PillListActivity.class);
             startActivity(intent);
@@ -65,6 +65,13 @@ public class threeButton extends AppCompatActivity {
             Intent i = new Intent(threeButton.this, SquareCamera.class);
             startActivity(i);
         });
+
+        // 알약 알림 설정 버튼
+        BtnAlarm.setOnClickListener(v -> {
+        Intent intent = new Intent(this, com.sookmyung.alarm.ui.AlarmListActivity.class);
+        startActivity(intent);
+        });
+
 
     }
     
