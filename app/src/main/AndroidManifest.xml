@@ -15,8 +15,8 @@
 
     <application
         // 추가한 부분
-        <activity android:name=".ui.PillListActivity" />
-        <activity android:name=".ui.AddPillActivity" />
+        <activity android:name=".list.ui.PillListActivity" />
+        <activity android:name=".list.ui.AddPillActivity" />
 
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
