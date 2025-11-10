@@ -1,1 +1,12 @@
+package com.sookmyung.model;
+
+public class Pill {
+    public String itemSeq, itemName, entpName, className, drugShape, color1;
+    public Pill() {}
+    public Pill(String itemSeq, String itemName, String entpName, String className,
+                String drugShape, String color1) {
+        this.itemSeq = itemSeq; this.itemName = itemName; this.entpName = entpName;
+        this.className = className; this.drugShape = drugShape; this.color1 = color1;
+    }
+}
 
