@@ -1,12 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
-    
-    <!-- 추가한 부분 -->
-    <uses-permission android:name="android.permission.INTERNET"/>
+<manifest
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    package="com.sookmyung.medicell">
+
+    <!-- 인터넷 사용 -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <!-- Android 13+ 알림 권한 -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- 카메라 권한 -->
     <uses-permission
         android:name="android.permission.CAMERA"
         tools:ignore="PermissionImpliesUnsupportedChromeOsHardware" />
@@ -16,19 +20,6 @@
         android:required="true" />
 
     <application
-        <!-- 추가한 부분 -->
-        <activity android:name=".list.ui.PillListActivity" />
-        <activity android:name=".list.ui.AddPillActivity" />
-
-        <!-- 알림 화면 등록 -->
-        <activity android:name=".alarm.ui.AlarmListActivity" />
-        <activity android:name=".alarm.ui.AddAlarmActivity" />
-
-        <!-- 알림 수신 리시버 -->
-        <receiver
-        android:name=".alarm.AlarmReceiver"
-        android:exported="false" />
-
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -37,15 +28,34 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Medicell">
+
+        <!-- 📌 리스트 화면 -->
+        <activity android:name="com.sookmyung.list.ui.PillListActivity" />
+        <activity android:name="com.sookmyung.list.ui.AddPillActivity" />
+
+        <!-- 📌 알림 화면 -->
+        <activity android:name="com.sookmyung.alarm.ui.AlarmListActivity" />
+        <activity android:name="com.sookmyung.alarm.ui.AddAlarmActivity" />
+
+        <!-- 📌 알림 리시버 -->
+        <receiver
+            android:name="com.sookmyung.alarm.AlarmReceiver"
+            android:exported="false" />
+
+        <!-- 카메라 화면 -->
         <activity
             android:name=".SquareCamera"
             android:exported="false" />
+
         <activity
             android:name=".CameraView"
             android:exported="false" />
+
         <activity
             android:name=".threeButton"
             android:exported="false" />
+
+        <!-- 첫 실행 화면 -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -53,10 +63,10 @@
             android:theme="@style/Theme.Medicell">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
     </application>
 
 </manifest>

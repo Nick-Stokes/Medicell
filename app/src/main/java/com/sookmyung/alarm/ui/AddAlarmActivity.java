@@ -37,8 +37,8 @@ public class AddAlarmActivity extends AppCompatActivity {
         btnAdd.setOnClickListener(v -> {
             if (names.isEmpty()) { finish(); return; }
             String pillName = (String) sp.getSelectedItem();
-            int hour = tp.getHour();
-            int minute = tp.getMinute();
+            int hour = tp.getCurrentHour();
+            int minute = tp.getCurrentMinute();
 
             Alarm a = new Alarm(UUID.randomUUID().toString(), pillName, hour, minute);
             AlarmStorage.add(this, a);
