@@ -1,6 +1,7 @@
 package com.sookmyung.medicell;
 
 import android.annotation.SuppressLint;
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.ImageDecoder;
 import android.graphics.Matrix;
@@ -68,7 +69,13 @@ public class CameraView extends AppCompatActivity {
         }
 
         btnRetake.setOnClickListener(v -> { finish();});
-        
+
+
+        btnNext.setOnClickListener(v -> {
+            Intent i = new Intent(CameraView.this, PillResult.class);
+            i.putExtra("photo_uri",photoUri.toString());
+            startActivity(i);
+        });
 
     }
 

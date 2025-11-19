@@ -1,16 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     package="com.sookmyung.medicell">
-
     <!-- 인터넷 사용 -->
-    <uses-permission android:name="android.permission.INTERNET" />
-
-    <!-- Android 13+ 알림 권한 -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-
-    <!-- 카메라 권한 -->
+    <uses-permission android:name="android.permission.INTERNET" /> <!-- Android 13+ 알림 권한 -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" /> <!-- 카메라 권한 -->
     <uses-permission
         android:name="android.permission.CAMERA"
         tools:ignore="PermissionImpliesUnsupportedChromeOsHardware" />
@@ -28,34 +22,26 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Medicell">
-
+        <activity
+            android:name=".PillResult"
+            android:exported="false" />
         <!-- 📌 리스트 화면 -->
         <activity android:name="com.sookmyung.list.ui.PillListActivity" />
-        <activity android:name="com.sookmyung.list.ui.AddPillActivity" />
-
-        <!-- 📌 알림 화면 -->
+        <activity android:name="com.sookmyung.list.ui.AddPillActivity" /> <!-- 📌 알림 화면 -->
         <activity android:name="com.sookmyung.alarm.ui.AlarmListActivity" />
-        <activity android:name="com.sookmyung.alarm.ui.AddAlarmActivity" />
-
-        <!-- 📌 알림 리시버 -->
+        <activity android:name="com.sookmyung.alarm.ui.AddAlarmActivity" /> <!-- 📌 알림 리시버 -->
         <receiver
             android:name="com.sookmyung.alarm.AlarmReceiver"
-            android:exported="false" />
-
-        <!-- 카메라 화면 -->
+            android:exported="false" /> <!-- 카메라 화면 -->
         <activity
             android:name=".SquareCamera"
             android:exported="false" />
-
         <activity
             android:name=".CameraView"
             android:exported="false" />
-
         <activity
             android:name=".threeButton"
-            android:exported="false" />
-
-        <!-- 첫 실행 화면 -->
+            android:exported="false" /> <!-- 첫 실행 화면 -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -63,10 +49,10 @@
             android:theme="@style/Theme.Medicell">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
+
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
     </application>
 
 </manifest>
