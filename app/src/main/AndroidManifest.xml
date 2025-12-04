@@ -23,9 +23,11 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Medicell">
         <activity
-            android:name=".PillResult"
+            android:name=".TabooCheck"
             android:exported="false" />
-        <!-- 📌 리스트 화면 -->
+        <activity
+            android:name=".PillResult"
+            android:exported="false" /> <!-- 📌 리스트 화면 -->
         <activity android:name="com.sookmyung.list.ui.PillListActivity" />
         <activity android:name="com.sookmyung.list.ui.AddPillActivity" /> <!-- 📌 알림 화면 -->
         <activity android:name="com.sookmyung.alarm.ui.AlarmListActivity" />

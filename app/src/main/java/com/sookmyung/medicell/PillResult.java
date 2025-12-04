@@ -1,5 +1,6 @@
 package com.sookmyung.medicell;
 
+import android.content.Intent; // ★ 추가
 import android.graphics.Bitmap;
 import android.graphics.ImageDecoder;
 import android.net.Uri;
@@ -62,6 +63,10 @@ public class PillResult extends AppCompatActivity {
     private String spokenName;    // 1위 약 이름
     private String spokenDetail;  // pillContentView 텍스트
 
+    // ★ 다음 페이지로 넘길 1위 알약 정보
+    private String bestItemSeq;   // 1위 알약 itemSeq
+    private String bestItemName;  // 1위 알약 이름(없으면 "코드 xxxx")
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -117,6 +122,21 @@ public class PillResult extends AppCompatActivity {
             voiceBtn.setOnClickListener(v -> speakPillInfo());
         }
 
+        // ★ next_list 버튼: 1위 알약 정보를 가지고 다음 페이지로 이동
+        View nextBtn = findViewById(R.id.next_list);
+        if (nextBtn != null) {
+            nextBtn.setOnClickListener(v -> {
+                if (bestItemSeq == null || bestItemSeq.isEmpty()) {
+                    Toast.makeText(this, "1위 알약 정보가 없습니다.", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                Intent it = new Intent(PillResult.this, TabooCheck.class);
+                it.putExtra("main_item_seq", bestItemSeq);
+                it.putExtra("main_item_name", bestItemName);
+                startActivity(it);
+            });
+        }
+
         if (photoBitmap != null && classifier != null) {
             runClassificationInBackground();
         } else {
@@ -168,9 +188,16 @@ public class PillResult extends AppCompatActivity {
                         pillContentView.setText("");
                         spokenName = null;
                         spokenDetail = null;
+                        // ★ 1위 알약 정보도 초기화
+                        bestItemSeq = null;
+                        bestItemName = null;
                     });
                     return;
                 }
+
+                // ★ 1위 알약 정보 저장용 (쓰레드 안에서 계산 → UI 쓰레드에서 필드에 반영)
+                String bestSeqLocal = null;
+                String bestNameLocal = null;
 
                 // 2) 예측 상위 100개까지:
                 //    병용금기 API, 알약식별 API 둘 다 호출해서
@@ -263,6 +290,10 @@ public class PillResult extends AppCompatActivity {
                         finalTopName = "코드 " + best.itemSeq;
                     }
 
+                    // ★ 1위 알약 정보 로컬 변수에 저장
+                    bestSeqLocal = best.itemSeq;
+                    bestNameLocal = finalTopName;
+
                     if (best.chart != null || best.className != null) {
                         StringBuilder sb = new StringBuilder();
                         sb.append("분류: ")
@@ -284,6 +315,7 @@ public class PillResult extends AppCompatActivity {
 
                     String fbTopName = null;
                     String fbTopDetail = null;
+                    String fbBestSeq = null; // ★ 1위 itemSeq 저장
 
                     int rank = 1;
                     for (PillClassifier.Prediction p : preds) {
@@ -307,6 +339,7 @@ public class PillResult extends AppCompatActivity {
 
                         if (rank == 1) {
                             fbTopName = nameForLine;
+                            fbBestSeq = itemSeq;
                             if (info != null && (info.chart != null || info.className != null)) {
                                 StringBuilder sb = new StringBuilder();
                                 sb.append("분류: ")
@@ -333,12 +366,18 @@ public class PillResult extends AppCompatActivity {
                     finalTopName   = fbTopName;
                     finalTopDetail = fbTopDetail;
                     finalTop5Text  = fallbackBuilder.toString();
+
+                    // ★ fallback에서도 1위 알약 정보 저장
+                    bestSeqLocal  = fbBestSeq;
+                    bestNameLocal = fbTopName;
                 }
 
-                // 4) UI 갱신 + TTS용 텍스트 저장
+                // 4) UI 갱신 + TTS용 텍스트 + 1위 알약 정보 저장
                 String finalTopNameCopy   = finalTopName;
                 String finalTopDetailCopy = finalTopDetail;
                 String finalTop5TextCopy  = finalTop5Text;
+                String bestSeqCopy        = bestSeqLocal;
+                String bestNameCopy       = bestNameLocal;
 
                 mainHandler.post(() -> {
                     pillLabelView.setText(finalTopNameCopy);
@@ -347,6 +386,10 @@ public class PillResult extends AppCompatActivity {
 
                     spokenName   = finalTopNameCopy;
                     spokenDetail = finalTopDetailCopy;
+
+                    // ★ 여기서 필드에 실제 반영 → next_list 버튼이 사용할 값
+                    bestItemSeq  = bestSeqCopy;
+                    bestItemName = bestNameCopy;
                 });
 
             } catch (Exception e) {
@@ -356,6 +399,9 @@ public class PillResult extends AppCompatActivity {
                     pillLabelView.setText("오류");
                     spokenName = null;
                     spokenDetail = null;
+                    // ★ 오류 시 1위 알약 정보도 초기화
+                    bestItemSeq = null;
+                    bestItemName = null;
                 });
             }
         }).start();
