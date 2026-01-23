@@ -8,28 +8,53 @@
     tools:context=".SquareCamera"
     android:background="@color/baseBeige">
 
-
     <LinearLayout
+        android:id="@+id/root"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
         android:gravity="center"
+        android:paddingTop="24dp"
+        android:paddingBottom="24dp"
         tools:ignore="MissingConstraints">
-        <androidx.camera.view.PreviewView
-            android:id="@+id/previewView"
+
+        <TextView
+            android:id="@+id/tvGuide"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="가이드라인에 알약을 맞춰주세요"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="@android:color/black"
+            android:layout_marginBottom="16dp"/>
+
+        <FrameLayout
+            android:id="@+id/previewContainer"
             android:layout_width="300dp"
-            android:layout_height="300dp"
-            tools:ignore="MissingConstraints" />
-        <ImageButton
-            android:layout_width="80dp"
-            android:layout_height="80dp"
-            android:id="@+id/btnCapture"
-            android:background="@android:color/transparent"
-            android:contentDescription="capture"
-            android:scaleType="centerCrop"
-            android:src="@drawable/camera_icon"
-            android:layout_marginTop="150dp"
-            tools:ignore="MissingConstraints" />
+            android:layout_height="300dp">
+
+            <androidx.camera.view.PreviewView
+                android:id="@+id/previewView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+
+            <com.sookmyung.medicell.GuideOverlayView
+                android:id="@+id/guideOverlay"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clickable="false"
+                android:focusable="false"/>
+        </FrameLayout>
+
+        <TextView
+            android:id="@+id/tvHint"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="초록색이 잠시 유지되면 자동 촬영됩니다"
+            android:textSize="14sp"
+            android:textColor="@android:color/darker_gray"
+            android:layout_marginTop="16dp"/>
+
     </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

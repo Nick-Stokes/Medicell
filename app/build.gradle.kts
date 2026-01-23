@@ -18,6 +18,26 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        ndk {
+            abiFilters += setOf("arm64-v8a")
+        }
+        externalNativeBuild {
+            cmake{
+                cppFlags += "-std=c++17"
+            }
+        }
+    }
+
+    externalNativeBuild{
+        cmake{
+            path = file("src/main/cpp/CMakeLists.txt")
+        }
+    }
+    sourceSets{
+        getByName("main"){
+            jniLibs.srcDirs("src/main/jniLibs")
+        }
     }
 
     buildTypes {
@@ -39,6 +59,8 @@ android {
     buildFeatures {
         compose = true
     }
+
+
 }
 
 dependencies {
@@ -77,4 +99,6 @@ dependencies {
     implementation("com.google.code.gson:gson:2.11.0")
 
     implementation("com.android.volley:volley:1.2.1")
+
+
 }
