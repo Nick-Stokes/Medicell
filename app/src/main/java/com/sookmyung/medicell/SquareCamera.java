@@ -35,8 +35,8 @@ import androidx.core.view.WindowInsetsCompat;
 import com.google.common.util.concurrent.ListenableFuture;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
@@ -45,11 +45,13 @@ public class SquareCamera extends AppCompatActivity {
 
     private static final String TAG = "SquareCameraROI";
 
-    // 분석 해상도(가볍게) + 가이드 반지름(224 기준)
+    // 분석 해상도
     private static final int ANALYSIS_SIZE = 224;
-    private static final int GUIDE_R = 40;
 
-    // 촬영 해상도(저장은 기존대로)
+    // 가이드 반지름 확대 (기존 40 -> 52)
+    private static final int GUIDE_R = 30;
+
+    // 촬영 해상도
     private static final Size CAPTURE_SIZE = new Size(1280, 1280);
 
     private PreviewView previewView;
@@ -58,22 +60,22 @@ public class SquareCamera extends AppCompatActivity {
     private ImageCapture imageCapture;
     private Executor mainExecutor;
 
-    // 1초 유지 자동촬영용
+    // 자동 촬영
     private long okSinceMs = 0L;
     private boolean isCapturing = false;
 
-    // (선택) 디버그/튜닝용 지표 받기
+    // 디버그 지표
     private final float[] metrics = new float[3]; // areaRatio, centerOffsetNorm, edgeDensity
 
-    private static final int WIN = 6;     // 최근 10프레임
-    private static final int ON_K = 4;     // 7개 이상 OK면 초록
-    private static final int OFF_K = 2;    // 4개 이하 OK면 빨강 (히스테리시스)
+    // sliding window / hysteresis
+    private static final int WIN = 6;
+    private static final int ON_K = 4;
+    private static final int OFF_K = 2;
 
     private final boolean[] okWin = new boolean[WIN];
     private int okPos = 0;
     private int okCount = 0;
     private boolean stableOk = false;
-
 
     private final ActivityResultLauncher<String> reqCam =
             registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {
@@ -98,16 +100,16 @@ public class SquareCamera extends AppCompatActivity {
 
         mainExecutor = ContextCompat.getMainExecutor(this);
 
-        // 오버레이 표시용 반지름: 프리뷰(300dp 정사각) 안에 적당히 보이게 스케일
-        // 분석 기준 r=80(224 기준)을 화면 표시 크기에 맞춰 비율로 환산
-        int displayR = (int) Math.round((GUIDE_R / (double) ANALYSIS_SIZE) * 300.0); // 300dp를 px로 안 바꾸는 "대략치"
-        // ※ dp->px를 정확히 하려면 getResources().getDisplayMetrics().density 곱해서 계산하면 됨.
-        // 지금은 처음 세팅이라 "대충" 보여주기만 하면 OK.
+        // 화면 표시용 원 반지름도 조금 더 크게
+        float density = getResources().getDisplayMetrics().density;
+        int previewBoxPx = (int) (300f * density); // 대략 300dp 기준
+        int displayR = (int) Math.round((GUIDE_R / (double) ANALYSIS_SIZE) * previewBoxPx);
+
         guideOverlay.setRadiusPx(displayR);
         guideOverlay.setOk(false);
 
-        // (선택) ABI 확인 로그
         Log.d(TAG, "SUPPORTED_ABIS = " + NativeBridge.abis());
+        Log.d(TAG, "GUIDE_R = " + GUIDE_R + ", displayR = " + displayR);
 
         reqCam.launch(Manifest.permission.CAMERA);
     }
@@ -139,7 +141,6 @@ public class SquareCamera extends AppCompatActivity {
                             return;
                         }
 
-                        // RGBA 연속 배열로 변환 (rowStride 정리)
                         byte[] rgba = toRgbaByteArray(image);
 
                         int okInt = NativeBridge.analyzeRoi(
@@ -152,12 +153,15 @@ public class SquareCamera extends AppCompatActivity {
 
                         boolean aligned = (okInt == 1);
 
-                        // 튜닝할 때만 주석 해제
-                        Log.d(TAG, "ok=" + aligned + " area=" + metrics[0] + " center=" + metrics[1] + " edge=" + metrics[2]);
+                        Log.d(TAG, "ok=" + aligned
+                                + " area=" + metrics[0]
+                                + " center=" + metrics[1]
+                                + " edge=" + metrics[2]);
 
                         onAlignedResult(aligned);
 
                     } catch (Exception e) {
+                        Log.e(TAG, "Analyzer error", e);
                         onAlignedResult(false);
                     } finally {
                         image.close();
@@ -174,22 +178,20 @@ public class SquareCamera extends AppCompatActivity {
                 );
 
             } catch (ExecutionException | InterruptedException e) {
-                e.printStackTrace();
+                Log.e(TAG, "카메라 시작 실패", e);
                 Toast.makeText(this, "카메라 시작 실패", Toast.LENGTH_SHORT).show();
             }
         }, mainExecutor);
     }
 
-    /** aligned 결과로 오버레이 색 변경 + 1초 유지되면 자동 촬영 */
+    /** aligned 결과로 오버레이 색 변경 + 잠깐 유지되면 자동 촬영 */
     private void onAlignedResult(boolean alignedRaw) {
-        // sliding window 업데이트
         boolean old = okWin[okPos];
         if (old) okCount--;
         okWin[okPos] = alignedRaw;
         if (alignedRaw) okCount++;
         okPos = (okPos + 1) % WIN;
 
-        // 히스테리시스: 켜질 때/꺼질 때 기준을 다르게
         boolean newStable = stableOk;
         if (!stableOk) {
             if (okCount >= ON_K) newStable = true;
@@ -210,7 +212,8 @@ public class SquareCamera extends AppCompatActivity {
             if (isCapturing) return;
             if (okSinceMs == 0L) okSinceMs = now;
 
-            if (now - okSinceMs >= 300L) {
+            // 기존 300ms -> 350ms 정도로 아주 살짝 안정화
+            if (now - okSinceMs >= 350L) {
                 isCapturing = true;
                 okSinceMs = 0L;
                 captureSquareAndSave();
@@ -227,12 +230,11 @@ public class SquareCamera extends AppCompatActivity {
         int height = image.getHeight();
 
         int rowStride = plane.getRowStride();
-        int pixelStride = plane.getPixelStride(); // 보통 4
+        int pixelStride = plane.getPixelStride();
 
         byte[] out = new byte[width * height * 4];
-
-        // rowStride가 width*4보다 클 수 있어서 행 단위로 풀어서 복사
         byte[] row = new byte[rowStride];
+
         int outIndex = 0;
         int pos = 0;
 
@@ -244,10 +246,10 @@ public class SquareCamera extends AppCompatActivity {
             for (int x = 0; x < width; x++) {
                 int base = rowIndex;
 
-                out[outIndex++] = row[base];       // R
-                out[outIndex++] = row[base + 1];   // G
-                out[outIndex++] = row[base + 2];   // B
-                out[outIndex++] = row[base + 3];   // A
+                out[outIndex++] = row[base];
+                out[outIndex++] = row[base + 1];
+                out[outIndex++] = row[base + 2];
+                out[outIndex++] = row[base + 3];
 
                 rowIndex += pixelStride;
             }
@@ -256,7 +258,7 @@ public class SquareCamera extends AppCompatActivity {
         return out;
     }
 
-    /** 자동 촬영: 기존 로직 유지 (1280 캡처 → 중앙 crop → 저장 → CameraView로 이동) */
+    /** 자동 촬영: 1280 캡처 → 중앙 square crop → 저장 → CameraView 이동 */
     private void captureSquareAndSave() {
         if (imageCapture == null) {
             Toast.makeText(this, "카메라 준비 중...", Toast.LENGTH_SHORT).show();
@@ -282,17 +284,16 @@ public class SquareCamera extends AppCompatActivity {
                     startActivity(i);
 
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    Log.e(TAG, "촬영 처리 실패", e);
                     Toast.makeText(SquareCamera.this, "촬영 처리 실패", Toast.LENGTH_SHORT).show();
                 } finally {
-                    // 다음 촬영 가능
                     isCapturing = false;
                 }
             }
 
             @Override
             public void onError(@NonNull ImageCaptureException exception) {
-                exception.printStackTrace();
+                Log.e(TAG, "촬영 실패", exception);
                 Toast.makeText(SquareCamera.this, "촬영 실패", Toast.LENGTH_SHORT).show();
                 isCapturing = false;
             }
@@ -310,7 +311,8 @@ public class SquareCamera extends AppCompatActivity {
     }
 
     private Bitmap cropCenterSquare(Bitmap src) {
-        int w = src.getWidth(), h = src.getHeight();
+        int w = src.getWidth();
+        int h = src.getHeight();
         int size = Math.min(w, h);
         int x = (w - size) / 2;
         int y = (h - size) / 2;
@@ -323,14 +325,21 @@ public class SquareCamera extends AppCompatActivity {
         ContentValues cv = new ContentValues();
         cv.put(MediaStore.Images.Media.DISPLAY_NAME, name);
         cv.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             cv.put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/" + subDir + "/");
         }
+
         Uri uri = cr.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cv);
         if (uri == null) throw new IOException("insert failed");
-        try (FileOutputStream fos = (FileOutputStream) cr.openOutputStream(uri)) {
-            bmp.compress(Bitmap.CompressFormat.JPEG, 95, fos);
+
+        try (OutputStream os = cr.openOutputStream(uri)) {
+            if (os == null) throw new IOException("openOutputStream returned null");
+            boolean ok = bmp.compress(Bitmap.CompressFormat.JPEG, 95, os);
+            if (!ok) throw new IOException("bitmap.compress failed");
+            os.flush();
         }
+
         return uri;
     }
 }
