@@ -1,3 +1,13 @@
 <resources>
     <string name="app_name">Medicell</string>
+    <string name="pill_select">약 선택</string>
+    <string name="time_select">시간 선택</string>
+    <string name="add">추가</string>
+    <string name="search_hint">약 이름 검색 (예: 게보린)</string>
+    <string name="search">검색</string>
+    <string name="alarm_list_title">알약 알림 목록</string>
+    <string name="pill_list_title">알약 리스트</string>
+    <string name="pill_name_placeholder">약 이름</string>
+    <string name="alarm_time_example">오전 8:00</string>
+    <string name="delete">삭제</string>
 </resources>

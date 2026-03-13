@@ -1,23 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="vertical" android:padding="12dp" android:background="#FAF6EE"
-    android:layout_width="match_parent" android:layout_height="match_parent">
+    android:orientation="vertical"
+    android:padding="12dp"
+    android:background="#FAF6EE"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
 
     <LinearLayout
-        android:orientation="horizontal" android:background="#EAEAEA"
-        android:padding="8dp" android:layout_width="match_parent" android:layout_height="wrap_content">
+        android:orientation="horizontal"
+        android:background="#EAEAEA"
+        android:padding="8dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
         <EditText
             android:id="@+id/etQuery"
-            android:hint="약 이름 검색 (예: 게보린)"
-            android:layout_weight="1" android:layout_width="0dp" android:layout_height="wrap_content"/>
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="@string/search_hint"
+            android:inputType="text"
+            android:singleLine="true"
+            android:imeOptions="actionSearch"
+            android:importantForAutofill="no" />
+
         <ImageView
             android:id="@+id/ivSearch"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
             android:src="@android:drawable/ic_menu_search"
-            android:layout_width="36dp" android:layout_height="36dp"/>
+            android:contentDescription="@string/search" />
     </LinearLayout>
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recycler"
         android:layout_marginTop="8dp"
-        android:layout_width="match_parent" android:layout_height="match_parent"/>
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
 </LinearLayout>

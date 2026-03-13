@@ -1,11 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="vertical" android:padding="6dp"
-    android:layout_width="match_parent" android:layout_height="wrap_content">
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:padding="8dp">
 
     <TextView
         android:id="@+id/tvName"
-        android:textStyle="bold" android:textColor="#333333"
-        android:padding="8dp" android:background="#FFFFFF"
-        android:layout_width="match_parent" android:layout_height="wrap_content"/>
+        android:layout_width="0dp"
+        android:layout_height="72dp"
+        android:layout_weight="1"
+        android:gravity="center_vertical"
+        android:textStyle="bold"
+        android:textSize="24sp"
+        android:textColor="#222222"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:background="#FFFFFF" />
+
+    <Button
+        android:id="@+id/btnDeleteItem"
+        android:layout_width="100dp"
+        android:layout_height="56dp"
+        android:layout_marginStart="10dp"
+        android:text="@string/delete"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:textColor="#222222"
+        android:backgroundTint="#E6CCB3" />
 </LinearLayout>
