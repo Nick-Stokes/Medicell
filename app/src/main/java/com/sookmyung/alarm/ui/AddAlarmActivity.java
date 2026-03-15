@@ -2,24 +2,27 @@ package com.sookmyung.alarm.ui;
 
 import android.Manifest;
 import android.app.AlarmManager;
+import android.app.Dialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.ColorDrawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
-import android.util.Log;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.Window;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.ListPopupWindow;
 import android.widget.NumberPicker;
-import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -34,6 +37,7 @@ import com.sookmyung.alarm.AlarmScheduler;
 import com.sookmyung.alarm.AlarmStorage;
 import com.sookmyung.list.Pill;
 import com.sookmyung.list.PillStorage;
+import com.sookmyung.list.ui.PillListActivity;
 import com.sookmyung.medicell.R;
 
 import java.util.ArrayList;
@@ -43,20 +47,25 @@ import java.util.UUID;
 
 public class AddAlarmActivity extends AppCompatActivity {
 
-    private static final String TAG = "MEDICELL_ALARM";
     private static final int REQ_POST_NOTIFICATIONS = 1001;
 
-    private Spinner sp;
+    private LinearLayout selectPillBox;
+    private TextView tvSelectedPill;
     private NumberPicker npAmPm;
     private NumberPicker npHour;
     private NumberPicker npMinute;
+
+    private final List<String> pillNames = new ArrayList<>();
+    private String selectedPillName = null;
+    private ListPopupWindow pillPopupWindow;
 
     @Override
     protected void onCreate(Bundle b) {
         super.onCreate(b);
         setContentView(R.layout.activity_add_alarm);
 
-        sp = findViewById(R.id.spPill);
+        selectPillBox = findViewById(R.id.selectPillBox);
+        tvSelectedPill = findViewById(R.id.tvSelectedPill);
         npAmPm = findViewById(R.id.npAmPm);
         npHour = findViewById(R.id.npHour);
         npMinute = findViewById(R.id.npMinute);
@@ -64,54 +73,7 @@ public class AddAlarmActivity extends AppCompatActivity {
         Button btnAdd = findViewById(R.id.btnAdd);
 
         requestNotificationPermissionIfNeeded();
-
-        List<Pill> pills = PillStorage.load(this);
-        List<String> names = new ArrayList<>();
-
-        for (Pill p : pills) {
-            if (p != null && p.itemName != null && !p.itemName.trim().isEmpty()) {
-                names.add(p.itemName);
-            }
-        }
-
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(
-                this,
-                android.R.layout.simple_spinner_item,
-                names
-        ) {
-            @NonNull
-            @Override
-            public View getView(int position, View convertView, @NonNull ViewGroup parent) {
-                View view = super.getView(position, convertView, parent);
-                setSpinnerTextStyle(view);
-                return view;
-            }
-
-            @NonNull
-            @Override
-            public View getDropDownView(int position, View convertView, @NonNull ViewGroup parent) {
-                View view = super.getDropDownView(position, convertView, parent);
-                setSpinnerTextStyle(view);
-                return view;
-            }
-
-            private void setSpinnerTextStyle(View view) {
-                if (view instanceof TextView) {
-                    TextView tv = (TextView) view;
-                    tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 22);
-                    tv.setTextColor(Color.BLACK);
-                    tv.setTypeface(Typeface.DEFAULT_BOLD);
-                    tv.setPadding(20, 20, 20, 20);
-                }
-            }
-        };
-
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        sp.setAdapter(adapter);
-
-        if (names.isEmpty()) {
-            Toast.makeText(this, "복용 알약 리스트에 먼저 약을 추가해주세요.", Toast.LENGTH_SHORT).show();
-        }
+        loadPillNames();
 
         setupAmPmPicker();
         setupHourPicker();
@@ -121,9 +83,24 @@ public class AddAlarmActivity extends AppCompatActivity {
         stylePickerInput(npHour);
         stylePickerInput(npMinute);
 
+        if (pillNames.isEmpty()) {
+            showNoPillDialog();
+        } else {
+            selectedPillName = pillNames.get(0);
+            tvSelectedPill.setText(selectedPillName);
+        }
+
+        selectPillBox.setOnClickListener(v -> {
+            if (pillNames.isEmpty()) {
+                showNoPillDialog();
+                return;
+            }
+            showPillDropdown();
+        });
+
         btnAdd.setOnClickListener(v -> {
-            if (names.isEmpty()) {
-                Toast.makeText(this, "복용 알약 리스트에 등록된 약이 없습니다.", Toast.LENGTH_SHORT).show();
+            if (pillNames.isEmpty()) {
+                showNoPillDialog();
                 return;
             }
 
@@ -131,8 +108,7 @@ public class AddAlarmActivity extends AppCompatActivity {
                 return;
             }
 
-            String pillName = (String) sp.getSelectedItem();
-            if (pillName == null || pillName.trim().isEmpty()) {
+            if (selectedPillName == null || selectedPillName.trim().isEmpty()) {
                 Toast.makeText(this, "약을 선택해주세요.", Toast.LENGTH_SHORT).show();
                 return;
             }
@@ -148,18 +124,104 @@ public class AddAlarmActivity extends AppCompatActivity {
                 hour24 = (hour12 == 12) ? 12 : hour12 + 12;
             }
 
-            Log.d(TAG, "사용자 입력 시간 / amPm=" + amPm
-                    + " / hour12=" + hour12
-                    + " / minute=" + minute
-                    + " / hour24=" + hour24);
-
-            Alarm a = new Alarm(UUID.randomUUID().toString(), pillName, hour24, minute);
+            Alarm a = new Alarm(UUID.randomUUID().toString(), selectedPillName, hour24, minute);
             AlarmStorage.add(this, a);
             AlarmScheduler.scheduleDaily(this, a);
 
             Toast.makeText(this, "알람이 추가되었습니다.", Toast.LENGTH_SHORT).show();
             finish();
         });
+    }
+
+    private void loadPillNames() {
+        pillNames.clear();
+
+        List<Pill> pills = PillStorage.load(this);
+        for (Pill p : pills) {
+            if (p != null && p.itemName != null && !p.itemName.trim().isEmpty()) {
+                pillNames.add(p.itemName);
+            }
+        }
+    }
+
+    private void showPillDropdown() {
+        if (pillPopupWindow != null && pillPopupWindow.isShowing()) {
+            pillPopupWindow.dismiss();
+        }
+
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(
+                this,
+                android.R.layout.simple_list_item_1,
+                pillNames
+        ) {
+            @NonNull
+            @Override
+            public View getView(int position, View convertView, @NonNull ViewGroup parent) {
+                View view = super.getView(position, convertView, parent);
+
+                if (view instanceof TextView) {
+                    TextView tv = (TextView) view;
+                    tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 22);
+                    tv.setTypeface(Typeface.DEFAULT_BOLD);
+                    tv.setTextColor(Color.parseColor("#222222"));
+                    tv.setPadding(24, 24, 24, 24);
+                    tv.setMaxLines(2);
+                }
+
+                return view;
+            }
+        };
+
+        pillPopupWindow = new ListPopupWindow(this);
+        pillPopupWindow.setAnchorView(selectPillBox);
+        pillPopupWindow.setAdapter(adapter);
+        pillPopupWindow.setModal(true);
+        pillPopupWindow.setBackgroundDrawable(new ColorDrawable(Color.WHITE));
+        pillPopupWindow.setHorizontalOffset(0);
+        pillPopupWindow.setVerticalOffset(8);
+        pillPopupWindow.setWidth(selectPillBox.getWidth());
+        pillPopupWindow.setHeight(ViewGroup.LayoutParams.WRAP_CONTENT);
+
+        pillPopupWindow.setOnItemClickListener((parent, view, position, id) -> {
+            selectedPillName = pillNames.get(position);
+            tvSelectedPill.setText(selectedPillName);
+            pillPopupWindow.dismiss();
+        });
+
+        selectPillBox.post(() -> {
+            pillPopupWindow.setWidth(selectPillBox.getWidth());
+            pillPopupWindow.show();
+        });
+    }
+
+    private void showNoPillDialog() {
+        Dialog dialog = new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog.setContentView(R.layout.dialog_add_pill_confirm);
+        dialog.setCancelable(false);
+
+        TextView tvMessage = dialog.findViewById(R.id.tvMessage);
+        Button btnNo = dialog.findViewById(R.id.btnNo);
+        Button btnYes = dialog.findViewById(R.id.btnYes);
+        LinearLayout buttonContainer = dialog.findViewById(R.id.buttonContainer);
+
+        tvMessage.setText("복용 알약 리스트에\n먼저 약을 추가해주세요.");
+        btnNo.setVisibility(View.GONE);
+        btnYes.setText("확인");
+        buttonContainer.setGravity(Gravity.CENTER);
+
+        btnYes.setOnClickListener(v -> {
+            dialog.dismiss();
+            startActivity(new Intent(this, PillListActivity.class));
+            finish();
+        });
+
+        dialog.show();
+
+        if (dialog.getWindow() != null) {
+            int width = (int) (getResources().getDisplayMetrics().widthPixels * 0.92f);
+            dialog.getWindow().setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
     }
 
     private boolean checkAndRequestAlarmPermissions() {
@@ -182,16 +244,11 @@ public class AddAlarmActivity extends AppCompatActivity {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             AlarmManager am = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
 
-            if (am != null) {
-                boolean canExact = am.canScheduleExactAlarms();
-                Log.d(TAG, "canScheduleExactAlarms=" + canExact);
-
-                if (!canExact) {
-                    Toast.makeText(this, "정확한 알람 권한을 허용해주세요.", Toast.LENGTH_LONG).show();
-                    Intent intent = new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM);
-                    startActivity(intent);
-                    return false;
-                }
+            if (am != null && !am.canScheduleExactAlarms()) {
+                Toast.makeText(this, "정확한 알람 권한을 허용해주세요.", Toast.LENGTH_LONG).show();
+                Intent intent = new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM);
+                startActivity(intent);
+                return false;
             }
         }
 
@@ -222,7 +279,6 @@ public class AddAlarmActivity extends AppCompatActivity {
         npAmPm.setWrapSelectorWheel(false);
         npAmPm.setDescendantFocusability(NumberPicker.FOCUS_BLOCK_DESCENDANTS);
         npAmPm.setValue(0);
-
         npAmPm.setOnValueChangedListener((picker, oldVal, newVal) ->
                 picker.post(() -> stylePickerInput(picker)));
     }
@@ -233,7 +289,6 @@ public class AddAlarmActivity extends AppCompatActivity {
         npHour.setWrapSelectorWheel(true);
         npHour.setDescendantFocusability(NumberPicker.FOCUS_BLOCK_DESCENDANTS);
         npHour.setValue(8);
-
         npHour.setOnValueChangedListener((picker, oldVal, newVal) ->
                 picker.post(() -> stylePickerInput(picker)));
     }
@@ -245,7 +300,6 @@ public class AddAlarmActivity extends AppCompatActivity {
         npMinute.setWrapSelectorWheel(true);
         npMinute.setDescendantFocusability(NumberPicker.FOCUS_BLOCK_DESCENDANTS);
         npMinute.setValue(0);
-
         npMinute.setOnValueChangedListener((picker, oldVal, newVal) ->
                 picker.post(() -> stylePickerInput(picker)));
     }

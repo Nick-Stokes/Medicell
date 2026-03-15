@@ -18,7 +18,8 @@ public class AlarmStorage {
         SharedPreferences sp = ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE);
         String json = sp.getString(KEY, "[]");
         Type t = new TypeToken<ArrayList<Alarm>>() {}.getType();
-        return new Gson().fromJson(json, t);
+        List<Alarm> list = new Gson().fromJson(json, t);
+        return list != null ? list : new ArrayList<>();
     }
 
     public static void save(Context ctx, List<Alarm> list) {
@@ -38,7 +39,7 @@ public class AlarmStorage {
         List<Alarm> list = load(ctx);
         List<Alarm> out = new ArrayList<>();
         for (Alarm x : list) {
-            if (!x.id.equals(a.id)) {
+            if (x.id == null || !x.id.equals(a.id)) {
                 out.add(x);
             }
         }
@@ -47,7 +48,7 @@ public class AlarmStorage {
 
     public static Alarm find(Context ctx, String id) {
         for (Alarm a : load(ctx)) {
-            if (a.id.equals(id)) {
+            if (a.id != null && a.id.equals(id)) {
                 return a;
             }
         }

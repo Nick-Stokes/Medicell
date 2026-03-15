@@ -1,22 +1,18 @@
 package com.sookmyung.alarm.ui;
 
-import android.Manifest;
+import android.app.Dialog;
 import android.content.Intent;
-import android.content.pm.PackageManager;
-import android.os.Build;
 import android.os.Bundle;
-import android.view.View;
+import android.view.ViewGroup;
+import android.view.Window;
 import android.widget.Button;
+import android.widget.TextView;
 
-import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.sookmyung.alarm.Alarm;
-import com.sookmyung.alarm.AlarmScheduler;
 import com.sookmyung.alarm.AlarmStorage;
 import com.sookmyung.medicell.R;
 
@@ -27,19 +23,9 @@ public class AlarmListActivity extends AppCompatActivity {
     private AlarmListAdapter adapter;
 
     @Override
-    protected void onCreate(Bundle b) {
-        super.onCreate(b);
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_alarm_list);
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-                        != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(
-                    this,
-                    new String[]{Manifest.permission.POST_NOTIFICATIONS},
-                    10
-            );
-        }
 
         RecyclerView rv = findViewById(R.id.recycler);
         rv.setLayoutManager(new LinearLayoutManager(this));
@@ -48,7 +34,8 @@ public class AlarmListActivity extends AppCompatActivity {
         rv.setAdapter(adapter);
 
         Button btnAdd = findViewById(R.id.btnAdd);
-        btnAdd.setOnClickListener(this::openAddAlarm);
+        btnAdd.setOnClickListener(v ->
+                startActivity(new Intent(this, AddAlarmActivity.class)));
 
         refresh();
     }
@@ -59,25 +46,38 @@ public class AlarmListActivity extends AppCompatActivity {
         refresh();
     }
 
-    private void openAddAlarm(View view) {
-        startActivity(new Intent(this, AddAlarmActivity.class));
-    }
-
     private void refresh() {
         List<Alarm> list = AlarmStorage.load(this);
         adapter.submit(list);
     }
 
     private void showDeleteDialog(Alarm alarm) {
-        new AlertDialog.Builder(this)
-                .setTitle("알람 삭제")
-                .setMessage("이 알람을 삭제하시겠습니까?")
-                .setPositiveButton("삭제", (dialog, which) -> {
-                    AlarmScheduler.cancel(this, alarm);
-                    AlarmStorage.remove(this, alarm);
-                    refresh();
-                })
-                .setNegativeButton("취소", null)
-                .show();
+
+        Dialog dialog = new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog.setContentView(R.layout.dialog_add_pill_confirm);
+
+        TextView tvMessage = dialog.findViewById(R.id.tvMessage);
+        TextView btnNo = dialog.findViewById(R.id.btnNo);
+        TextView btnYes = dialog.findViewById(R.id.btnYes);
+
+        tvMessage.setText("이 알람을 삭제하시겠습니까?");
+        btnNo.setText("취소");
+        btnYes.setText("삭제");
+
+        btnNo.setOnClickListener(v -> dialog.dismiss());
+
+        btnYes.setOnClickListener(v -> {
+            AlarmStorage.remove(this, alarm);
+            refresh();
+            dialog.dismiss();
+        });
+
+        dialog.show();
+
+        if (dialog.getWindow() != null) {
+            int width = (int) (getResources().getDisplayMetrics().widthPixels * 0.92f);
+            dialog.getWindow().setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
     }
 }

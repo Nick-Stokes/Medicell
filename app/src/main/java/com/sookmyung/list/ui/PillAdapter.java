@@ -7,7 +7,6 @@ import android.widget.Button;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.widget.TooltipCompat;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.sookmyung.list.Pill;
@@ -62,11 +61,13 @@ public class PillAdapter extends RecyclerView.Adapter<PillAdapter.VH> {
     @Override
     public void onBindViewHolder(@NonNull VH h, int pos) {
         Pill p = items.get(pos);
-
         h.tvName.setText(p.itemName);
 
-        String tip = "효능: " + (p.className == null ? "-" : p.className);
-        TooltipCompat.setTooltipText(h.itemView, tip);
+        h.itemView.setOnClickListener(v -> {
+            if (itemCb != null) {
+                itemCb.onClick(p);
+            }
+        });
 
         h.tvName.setOnClickListener(v -> {
             if (itemCb != null) {
