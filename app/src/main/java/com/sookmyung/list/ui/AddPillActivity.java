@@ -1,13 +1,25 @@
 package com.sookmyung.list.ui;
 
+import android.app.Dialog;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.util.Log;
+import android.view.KeyEvent;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.Window;
+import android.view.inputmethod.EditorInfo;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.ProgressBar;
+import android.widget.TextView;
+import android.widget.Toast;
 
-import androidx.appcompat.app.AlertDialog;
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -16,26 +28,33 @@ import com.sookmyung.list.ApiClient;
 import com.sookmyung.list.ApiEnvelope;
 import com.sookmyung.list.ApiService;
 import com.sookmyung.list.Pill;
+import com.sookmyung.list.PillSearchCache;
 import com.sookmyung.list.PillStorage;
 import com.sookmyung.medicell.R;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 
-/** 약 검색/자동완성 → 추가 확인 */
 public class AddPillActivity extends AppCompatActivity {
 
-    private RecyclerView rv;
-    private SimpleItemAdapter adapter;
-    private ApiService api;
-    private final Handler handler = new Handler();
-    private Runnable pending;
+    private static final String TAG = "PILL_SEQ";
     private static final String KEY =
-            "4bb3d4b518ab34f31028273c6d60817e75a88b80bd05abf218bd21e700e0fbf6";
+            "05e7eb40989bb1a835e6fbcc11e6143335a7e69dcacb6929762947845547d798";
+
+    private ApiService api;
+    private SearchResultAdapter adapter;
+    private ProgressBar progressBar;
+    private EditText etQuery;
+
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private Runnable pendingSearch;
+    private String lastQuery = "";
 
     @Override
     protected void onCreate(Bundle b) {
@@ -44,72 +63,415 @@ public class AddPillActivity extends AppCompatActivity {
 
         api = ApiClient.get();
 
-        rv = findViewById(R.id.recycler);
+        RecyclerView rv = findViewById(R.id.recycler);
+        etQuery = findViewById(R.id.etQuery);
+        ImageView iv = findViewById(R.id.ivSearch);
+        progressBar = findViewById(R.id.progressBar);
+
         rv.setLayoutManager(new LinearLayoutManager(this));
-        adapter = new SimpleItemAdapter(item -> new AlertDialog.Builder(this)
-                .setMessage(item.itemName + "을(를) 추가하시겠습니까?")
-                .setPositiveButton("예", (d, w) -> {
-                    PillStorage.add(this,
-                            new Pill(item.itemSeq, item.itemName, item.entpName,
-                                     item.className, item.drugShape, item.color1));
-                    finish();
-                })
-                .setNegativeButton("아니오", null)
-                .show());
+        adapter = new SearchResultAdapter(this::handlePick);
         rv.setAdapter(adapter);
 
-        EditText et = findViewById(R.id.etQuery);
-        ImageView iv = findViewById(R.id.ivSearch);
-
-        iv.setOnClickListener(v -> fetch(et.getText().toString().trim()));
-
-        // 디바운스 400ms 자동 검색
-        et.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
-            @Override public void onTextChanged(CharSequence s, int st, int bfr, int cnt) {
-                if (pending != null) handler.removeCallbacks(pending);
-                pending = () -> fetch(s.toString().trim());
-                handler.postDelayed(pending, 400);
-            }
-            @Override public void afterTextChanged(Editable s) {}
+        iv.setOnClickListener(v -> {
+            cancelPendingSearch();
+            submitExactSearch(etQuery.getText().toString());
         });
-    }
 
-    private void fetch(String q) {
-        if (q.isEmpty()) { adapter.submit(new ArrayList<>()); return; }
-        api.searchPills(KEY, 1, 10, "json", q).enqueue(new Callback<ApiEnvelope>() {
-            @Override public void onResponse(Call<ApiEnvelope> call, Response<ApiEnvelope> res) {
-                List<ApiEnvelope.Item> items = new ArrayList<>();
-                if (res.isSuccessful() && res.body()!=null &&
-                    res.body().body!=null && res.body().body.items!=null) {
-                    items = res.body().body.items;
+        etQuery.setOnEditorActionListener((v, actionId, event) -> {
+            boolean isSearchAction =
+                    actionId == EditorInfo.IME_ACTION_SEARCH
+                            || actionId == EditorInfo.IME_ACTION_DONE
+                            || actionId == EditorInfo.IME_ACTION_GO
+                            || actionId == EditorInfo.IME_ACTION_UNSPECIFIED
+                            || actionId == EditorInfo.IME_NULL;
+
+            boolean isEnterKey =
+                    event != null
+                            && event.getAction() == KeyEvent.ACTION_DOWN
+                            && event.getKeyCode() == KeyEvent.KEYCODE_ENTER;
+
+            if (isSearchAction || isEnterKey) {
+                v.post(() -> submitExactSearch(v.getText().toString()));
+                return true;
+            }
+            return false;
+        });
+
+        etQuery.setOnKeyListener((v, keyCode, event) -> {
+            if (keyCode == KeyEvent.KEYCODE_ENTER
+                    && event != null
+                    && event.getAction() == KeyEvent.ACTION_DOWN) {
+                v.post(() -> submitExactSearch(etQuery.getText().toString()));
+                return true;
+            }
+            return false;
+        });
+
+        etQuery.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                cancelPendingSearch();
+
+                String query = normalize(s.toString());
+                if (query.isEmpty()) {
+                    lastQuery = "";
+                    adapter.submit(new ArrayList<>());
+                    progressBar.setVisibility(View.GONE);
+                    return;
                 }
-                adapter.submit(items);
+
+                pendingSearch = () -> fetch(query, false);
+                handler.postDelayed(pendingSearch, 300);
             }
-            @Override public void onFailure(Call<ApiEnvelope> call, Throwable t) {
+
+            @Override
+            public void afterTextChanged(Editable s) { }
+        });
+    }
+
+    private void submitExactSearch(String rawQuery) {
+        cancelPendingSearch();
+
+        String query = normalize(rawQuery);
+        if (query.isEmpty()) {
+            adapter.submit(new ArrayList<>());
+            progressBar.setVisibility(View.GONE);
+            return;
+        }
+
+        ApiEnvelope.Item currentExact = adapter.findExactMatch(query);
+        if (currentExact != null) {
+            handlePick(currentExact);
+            return;
+        }
+
+        fetch(query, true);
+    }
+
+    private void cancelPendingSearch() {
+        if (pendingSearch != null) {
+            handler.removeCallbacks(pendingSearch);
+            pendingSearch = null;
+        }
+    }
+
+    private void handlePick(ApiEnvelope.Item item) {
+        if (item == null) return;
+
+        Log.d(TAG, item.itemName + " / " + item.itemSeq);
+
+        if (isAlreadyAdded(item.itemSeq)) {
+            Toast.makeText(this, "이미 추가된 알약입니다.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        showAddConfirmDialog(item);
+    }
+
+    private void fetch(String rawQuery, boolean openExactDialogIfMatched) {
+        final String query = normalize(rawQuery);
+
+        if (query.isEmpty()) {
+            adapter.submit(new ArrayList<>());
+            progressBar.setVisibility(View.GONE);
+            return;
+        }
+
+        List<ApiEnvelope.Item> cached = PillSearchCache.get(this, query);
+        if (cached != null) {
+            progressBar.setVisibility(View.GONE);
+            List<ApiEnvelope.Item> filtered = sortAndFilter(cached, query);
+            afterSearch(query, filtered, openExactDialogIfMatched);
+            lastQuery = query;
+            return;
+        }
+
+        if (query.equals(lastQuery) && !openExactDialogIfMatched) {
+            return;
+        }
+        lastQuery = query;
+
+        progressBar.setVisibility(View.VISIBLE);
+
+        api.searchPills(KEY, 1, 200, "json", query).enqueue(new Callback<ApiEnvelope>() {
+            @Override
+            public void onResponse(@NonNull Call<ApiEnvelope> call,
+                                   @NonNull Response<ApiEnvelope> res) {
+                progressBar.setVisibility(View.GONE);
+
+                List<ApiEnvelope.Item> filtered = filterResponse(res, query);
+                PillSearchCache.put(AddPillActivity.this, query, filtered);
+                afterSearch(query, filtered, openExactDialogIfMatched);
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<ApiEnvelope> call, @NonNull Throwable t) {
+                progressBar.setVisibility(View.GONE);
                 adapter.submit(new ArrayList<>());
+                Toast.makeText(AddPillActivity.this, "검색 실패: 네트워크를 확인해주세요.", Toast.LENGTH_SHORT).show();
             }
         });
     }
 
-    /** 검색 결과 간단 표시용 어댑터 */
-    static class SimpleItemAdapter extends RecyclerView.Adapter<SimpleItemVH> {
-        interface OnPick { void pick(ApiEnvelope.Item item); }
+    private List<ApiEnvelope.Item> filterResponse(Response<ApiEnvelope> res, String query) {
+        List<ApiEnvelope.Item> result = new ArrayList<>();
+
+        if (res.isSuccessful()
+                && res.body() != null
+                && res.body().body != null
+                && res.body().body.items != null) {
+
+            for (ApiEnvelope.Item item : res.body().body.items) {
+                if (item == null || item.itemName == null) {
+                    continue;
+                }
+
+                String itemName = normalize(item.itemName);
+                if (itemName.startsWith(query) || itemName.contains(query)) {
+                    result.add(item);
+                }
+            }
+        }
+
+        return sortAndFilter(result, query);
+    }
+
+    private List<ApiEnvelope.Item> sortAndFilter(List<ApiEnvelope.Item> source, String query) {
+        List<ApiEnvelope.Item> result = new ArrayList<>(source);
+
+        Collections.sort(result, new Comparator<ApiEnvelope.Item>() {
+            @Override
+            public int compare(ApiEnvelope.Item a, ApiEnvelope.Item b) {
+                String aName = normalize(a.itemName);
+                String bName = normalize(b.itemName);
+
+                int aScore = getMatchScore(aName, query);
+                int bScore = getMatchScore(bName, query);
+
+                if (aScore != bScore) {
+                    return Integer.compare(aScore, bScore);
+                }
+
+                int aIndex = aName.indexOf(query);
+                int bIndex = bName.indexOf(query);
+                if (aIndex != bIndex) {
+                    return Integer.compare(aIndex, bIndex);
+                }
+
+                int aGap = Math.abs(aName.length() - query.length());
+                int bGap = Math.abs(bName.length() - query.length());
+                if (aGap != bGap) {
+                    return Integer.compare(aGap, bGap);
+                }
+
+                return aName.compareTo(bName);
+            }
+        });
+
+        return result;
+    }
+
+    private int getMatchScore(String itemName, String query) {
+        if (itemName.equals(query)) return 0;
+        if (itemName.startsWith(query)) return 1;
+
+        int index = itemName.indexOf(query);
+        if (index >= 0) return 2 + index;
+
+        return 100;
+    }
+
+    private void afterSearch(String query,
+                             List<ApiEnvelope.Item> filtered,
+                             boolean openExactDialogIfMatched) {
+        adapter.submit(filtered);
+
+        if (filtered.isEmpty()) {
+            return;
+        }
+
+        ApiEnvelope.Item exact = findExactMatch(filtered, query);
+        if (openExactDialogIfMatched && exact != null) {
+            handlePick(exact);
+        }
+    }
+
+    private ApiEnvelope.Item findExactMatch(List<ApiEnvelope.Item> items, String query) {
+        if (items == null) return null;
+
+        for (ApiEnvelope.Item item : items) {
+            if (item != null && query.equals(normalize(item.itemName))) {
+                return item;
+            }
+        }
+        return null;
+    }
+
+    private void showAddConfirmDialog(ApiEnvelope.Item item) {
+        final Dialog dialog = new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog.setContentView(R.layout.dialog_add_pill_confirm);
+
+        TextView tvMessage = dialog.findViewById(R.id.tvMessage);
+        Button btnNo = dialog.findViewById(R.id.btnNo);
+        Button btnYes = dialog.findViewById(R.id.btnYes);
+
+        String pillName = item.itemName == null ? "" : item.itemName.trim();
+        tvMessage.setText(pillName + "\n을(를) 추가하시겠습니까?");
+
+        btnNo.setText("아니오");
+        btnYes.setText("예");
+
+        btnNo.setOnClickListener(v -> dialog.dismiss());
+
+        btnYes.setOnClickListener(v -> {
+            PillStorage.add(
+                    this,
+                    new Pill(
+                            item.itemSeq,
+                            item.itemName,
+                            item.entpName,
+                            item.className,
+                            item.drugShape,
+                            item.color1,
+                            item.itemImage
+                    )
+            );
+
+            Toast.makeText(
+                    this,
+                    item.itemName + "이(가) 추가되었습니다.",
+                    Toast.LENGTH_SHORT
+            ).show();
+
+            dialog.dismiss();
+            finish();
+        });
+
+        dialog.show();
+
+        if (dialog.getWindow() != null) {
+            int width = (int) (getResources().getDisplayMetrics().widthPixels * 0.92f);
+            dialog.getWindow().setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
+    }
+
+    private String normalize(String text) {
+        if (text == null) return "";
+        return text.trim().replace(" ", "").replace("\n", "");
+    }
+
+    private boolean isAlreadyAdded(String itemSeq) {
+        List<Pill> current = PillStorage.load(this);
+        for (Pill pill : current) {
+            if (pill != null
+                    && pill.itemSeq != null
+                    && pill.itemSeq.equals(itemSeq)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static class SearchResultAdapter extends RecyclerView.Adapter<SearchResultVH> {
+
+        interface OnPick {
+            void pick(ApiEnvelope.Item item);
+        }
+
         private final List<ApiEnvelope.Item> data = new ArrayList<>();
         private final OnPick cb;
-        SimpleItemAdapter(OnPick cb){ this.cb = cb; }
-        void submit(List<ApiEnvelope.Item> d){ data.clear(); if(d!=null) data.addAll(d); notifyDataSetChanged(); }
-        @Override public SimpleItemVH onCreateViewHolder(android.view.ViewGroup p, int vt){
-            android.view.View v = android.view.LayoutInflater.from(p.getContext())
-                    .inflate(android.R.layout.simple_list_item_1, p, false);
-            return new SimpleItemVH(v);
+
+        SearchResultAdapter(OnPick cb) {
+            this.cb = cb;
         }
-        @Override public void onBindViewHolder(SimpleItemVH h, int pos){
-            ApiEnvelope.Item i = data.get(pos);
-            ((android.widget.TextView)h.itemView.findViewById(android.R.id.text1)).setText(i.itemName);
-            h.itemView.setOnClickListener(v -> { if (cb!=null) cb.pick(i); });
+
+        void submit(List<ApiEnvelope.Item> d) {
+            int oldSize = data.size();
+            if (oldSize > 0) {
+                data.clear();
+                notifyItemRangeRemoved(0, oldSize);
+            } else {
+                data.clear();
+            }
+
+            if (d != null && !d.isEmpty()) {
+                data.addAll(d);
+                notifyItemRangeInserted(0, data.size());
+            }
         }
-        @Override public int getItemCount(){ return data.size(); }
+
+        ApiEnvelope.Item findExactMatch(String query) {
+            if (query == null) return null;
+
+            String normalizedQuery = query.trim().replace(" ", "").replace("\n", "");
+            for (ApiEnvelope.Item item : data) {
+                if (item != null && item.itemName != null) {
+                    String itemName = item.itemName.trim().replace(" ", "").replace("\n", "");
+                    if (normalizedQuery.equals(itemName)) {
+                        return item;
+                    }
+                }
+            }
+            return null;
+        }
+
+        @NonNull
+        @Override
+        public SearchResultVH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            View v = android.view.LayoutInflater.from(parent.getContext())
+                    .inflate(R.layout.item_pill_search, parent, false);
+            return new SearchResultVH(v);
+        }
+
+        @Override
+        public void onBindViewHolder(@NonNull SearchResultVH holder, int position) {
+            ApiEnvelope.Item item = data.get(position);
+
+            holder.tvName.setText(item.itemName);
+            holder.tvSub.setText(buildSubText(item));
+
+            holder.itemView.setOnClickListener(v -> {
+                if (cb != null) {
+                    cb.pick(item);
+                }
+            });
+        }
+
+        private String buildSubText(ApiEnvelope.Item item) {
+            String entp = safe(item.entpName);
+            String cls = safe(item.className);
+
+            if (!entp.isEmpty() && !cls.isEmpty()) {
+                return entp + " · " + cls;
+            }
+            if (!entp.isEmpty()) {
+                return entp;
+            }
+            return cls;
+        }
+
+        private String safe(String text) {
+            return text == null ? "" : text.trim();
+        }
+
+        @Override
+        public int getItemCount() {
+            return data.size();
+        }
     }
-    static class SimpleItemVH extends RecyclerView.ViewHolder { SimpleItemVH(android.view.View v){ super(v); } }
+
+    static class SearchResultVH extends RecyclerView.ViewHolder {
+        TextView tvName;
+        TextView tvSub;
+
+        SearchResultVH(@NonNull View itemView) {
+            super(itemView);
+            tvName = itemView.findViewById(R.id.tvName);
+            tvSub = itemView.findViewById(R.id.tvSub);
+        }
+    }
 }

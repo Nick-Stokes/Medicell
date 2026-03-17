@@ -23,19 +23,20 @@ android {
             abiFilters += setOf("arm64-v8a")
         }
         externalNativeBuild {
-            cmake{
+            cmake {
                 cppFlags += "-std=c++17"
             }
         }
     }
 
-    externalNativeBuild{
-        cmake{
+    externalNativeBuild {
+        cmake {
             path = file("src/main/cpp/CMakeLists.txt")
         }
     }
-    sourceSets{
-        getByName("main"){
+
+    sourceSets {
+        getByName("main") {
             jniLibs.srcDirs("src/main/jniLibs")
         }
     }
@@ -49,18 +50,19 @@ android {
             )
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+
     kotlinOptions {
         jvmTarget = "11"
     }
+
     buildFeatures {
         compose = true
     }
-
-
 }
 
 dependencies {
@@ -70,7 +72,6 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:$camerax_version")
     implementation("androidx.camera:camera-view:$camerax_version")
     implementation("org.tensorflow:tensorflow-lite:2.14.0")
-
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -84,6 +85,15 @@ dependencies {
     implementation(libs.material)
     implementation(libs.androidx.activity)
     implementation(libs.androidx.constraintlayout)
+
+    implementation("androidx.recyclerview:recyclerview:1.3.2")
+    implementation("com.squareup.retrofit2:retrofit:2.11.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.11.0")
+    implementation("com.google.code.gson:gson:2.11.0")
+    implementation("com.android.volley:volley:1.2.1")
+    implementation("com.github.bumptech.glide:glide:4.16.0")
+    annotationProcessor("com.github.bumptech.glide:compiler:4.16.0")
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -91,14 +101,4 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
-
-// 추가한 부분
-    implementation("androidx.recyclerview:recyclerview:1.3.2")
-    implementation("com.squareup.retrofit2:retrofit:2.11.0")
-    implementation("com.squareup.retrofit2:converter-gson:2.11.0")
-    implementation("com.google.code.gson:gson:2.11.0")
-
-    implementation("com.android.volley:volley:1.2.1")
-
-
 }
