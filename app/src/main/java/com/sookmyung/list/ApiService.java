@@ -13,6 +13,6 @@ public interface ApiService {
             @Query("pageNo") int pageNo,
             @Query("numOfRows") int rows,
             @Query("type") String type,
-            @Query("item_name") String itemName
+            @Query("item_name") String itemName  // 부분 검색: "게보"
     );
 }

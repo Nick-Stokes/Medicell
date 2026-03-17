@@ -48,8 +48,16 @@ public class SquareCamera extends AppCompatActivity {
     // 분석 해상도
     private static final int ANALYSIS_SIZE = 224;
 
-    // 가이드 반지름 확대 (기존 40 -> 52)
+    // 분석 프레임에서 guide 원 반지름
     private static final int GUIDE_R = 30;
+
+    // 최종 classifier 입력 크기
+    private static final int FINAL_INPUT_SIZE = 224;
+
+    // guide 기준 crop margin
+    // Python의 side = base * (1.0 + margin_ratio) 감각
+    private static final float GUIDE_MARGIN_RATIO = 0.10f;
+    private static final float MIN_CROP_RATIO = 0.16f;
 
     // 촬영 해상도
     private static final Size CAPTURE_SIZE = new Size(1280, 1280);
@@ -79,8 +87,11 @@ public class SquareCamera extends AppCompatActivity {
 
     private final ActivityResultLauncher<String> reqCam =
             registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {
-                if (granted) startCamera();
-                else Toast.makeText(this, "카메라 권한이 필요합니다.", Toast.LENGTH_SHORT).show();
+                if (granted) {
+                    startCamera();
+                } else {
+                    Toast.makeText(this, "카메라 권한이 필요합니다.", Toast.LENGTH_SHORT).show();
+                }
             });
 
     @Override
@@ -100,9 +111,8 @@ public class SquareCamera extends AppCompatActivity {
 
         mainExecutor = ContextCompat.getMainExecutor(this);
 
-        // 화면 표시용 원 반지름도 조금 더 크게
         float density = getResources().getDisplayMetrics().density;
-        int previewBoxPx = (int) (300f * density); // 대략 300dp 기준
+        int previewBoxPx = (int) (300f * density);
         int displayR = (int) Math.round((GUIDE_R / (double) ANALYSIS_SIZE) * previewBoxPx);
 
         guideOverlay.setRadiusPx(displayR);
@@ -110,6 +120,7 @@ public class SquareCamera extends AppCompatActivity {
 
         Log.d(TAG, "SUPPORTED_ABIS = " + NativeBridge.abis());
         Log.d(TAG, "GUIDE_R = " + GUIDE_R + ", displayR = " + displayR);
+        Log.d(TAG, "GUIDE_MARGIN_RATIO = " + GUIDE_MARGIN_RATIO);
 
         reqCam.launch(Manifest.permission.CAMERA);
     }
@@ -184,12 +195,13 @@ public class SquareCamera extends AppCompatActivity {
         }, mainExecutor);
     }
 
-    /** aligned 결과로 오버레이 색 변경 + 잠깐 유지되면 자동 촬영 */
     private void onAlignedResult(boolean alignedRaw) {
         boolean old = okWin[okPos];
         if (old) okCount--;
+
         okWin[okPos] = alignedRaw;
         if (alignedRaw) okCount++;
+
         okPos = (okPos + 1) % WIN;
 
         boolean newStable = stableOk;
@@ -209,19 +221,20 @@ public class SquareCamera extends AppCompatActivity {
                 okSinceMs = 0L;
                 return;
             }
+
             if (isCapturing) return;
+
             if (okSinceMs == 0L) okSinceMs = now;
 
-            // 기존 300ms -> 350ms 정도로 아주 살짝 안정화
             if (now - okSinceMs >= 350L) {
                 isCapturing = true;
                 okSinceMs = 0L;
-                captureSquareAndSave();
+                captureAndSendFinal224();
             }
         });
     }
 
-    /** RGBA_8888 ImageProxy → width*height*4 연속 byte[] */
+    /** RGBA_8888 ImageProxy -> byte[] */
     private byte[] toRgbaByteArray(ImageProxy image) {
         ImageProxy.PlaneProxy plane = image.getPlanes()[0];
         ByteBuffer buf = plane.getBuffer();
@@ -255,11 +268,12 @@ public class SquareCamera extends AppCompatActivity {
             }
             pos += rowStride;
         }
+
         return out;
     }
 
-    /** 자동 촬영: 1280 캡처 → 중앙 square crop → 저장 → CameraView 이동 */
-    private void captureSquareAndSave() {
+    /** 자동 촬영 -> 중앙 square -> guide 기준 crop -> 224x224 -> 하나만 전달 */
+    private void captureAndSendFinal224() {
         if (imageCapture == null) {
             Toast.makeText(this, "카메라 준비 중...", Toast.LENGTH_SHORT).show();
             isCapturing = false;
@@ -273,14 +287,24 @@ public class SquareCamera extends AppCompatActivity {
             @Override
             public void onImageSaved(@NonNull ImageCapture.OutputFileResults outputFileResults) {
                 try {
-                    Bitmap bmp = loadBitmap(orig);
-                    if (bmp == null) throw new IOException("decode failed");
+                    Bitmap captured = loadBitmap(orig);
+                    if (captured == null) throw new IOException("decode failed");
 
-                    Bitmap square = cropCenterSquare(bmp);
-                    Uri saved = saveToPictures(square, "SquareCam");
+                    Bitmap square = cropCenterSquare(captured);
+                    Bitmap guideCrop = cropByGuideRegion(square);
+                    Bitmap final224 = resizeBitmap(guideCrop, FINAL_INPUT_SIZE, FINAL_INPUT_SIZE);
+
+                    Uri final224Uri = saveToPictures(final224, "SquareCamCrop224");
+
+                    Log.d(TAG, "captured size = " + captured.getWidth() + "x" + captured.getHeight());
+                    Log.d(TAG, "square size = " + square.getWidth() + "x" + square.getHeight());
+                    Log.d(TAG, "guideCrop size = " + guideCrop.getWidth() + "x" + guideCrop.getHeight());
+                    Log.d(TAG, "final224 size = " + final224.getWidth() + "x" + final224.getHeight());
+                    Log.d(TAG, "final224Uri = " + final224Uri);
 
                     Intent i = new Intent(SquareCamera.this, CameraView.class);
-                    i.putExtra("photo_uri", saved.toString());
+                    i.putExtra("photo_uri", final224Uri.toString());
+                    i.putExtra("is_auto_crop", true);
                     startActivity(i);
 
                 } catch (Exception e) {
@@ -314,14 +338,59 @@ public class SquareCamera extends AppCompatActivity {
         int w = src.getWidth();
         int h = src.getHeight();
         int size = Math.min(w, h);
+
         int x = (w - size) / 2;
         int y = (h - size) / 2;
+
         return Bitmap.createBitmap(src, x, y, size, size);
+    }
+
+    private Bitmap cropByGuideRegion(Bitmap square) {
+        int w = square.getWidth();
+        int h = square.getHeight();
+
+        int cx = w / 2;
+        int cy = h / 2;
+
+        float guideDiameterRatio = (2f * GUIDE_R) / (float) ANALYSIS_SIZE;
+        float baseCropSize = w * guideDiameterRatio;
+        int cropSize = Math.round(baseCropSize * (1.0f + GUIDE_MARGIN_RATIO));
+
+        int minCropSize = Math.round(w * MIN_CROP_RATIO);
+        cropSize = Math.max(cropSize, minCropSize);
+        cropSize = Math.min(cropSize, Math.min(w, h));
+
+        int left = cx - cropSize / 2;
+        int top = cy - cropSize / 2;
+
+        if (left < 0) left = 0;
+        if (top < 0) top = 0;
+        if (left + cropSize > w) left = w - cropSize;
+        if (top + cropSize > h) top = h - cropSize;
+
+        left = Math.max(0, left);
+        top = Math.max(0, top);
+
+        Log.d(TAG, "cropByGuideRegion:"
+                + " w=" + w
+                + ", h=" + h
+                + ", guideDiameterRatio=" + guideDiameterRatio
+                + ", baseCropSize=" + baseCropSize
+                + ", cropSize=" + cropSize
+                + ", left=" + left
+                + ", top=" + top);
+
+        return Bitmap.createBitmap(square, left, top, cropSize, cropSize);
+    }
+
+    private Bitmap resizeBitmap(Bitmap src, int dstW, int dstH) {
+        return Bitmap.createScaledBitmap(src, dstW, dstH, true);
     }
 
     private Uri saveToPictures(Bitmap bmp, String subDir) throws IOException {
         String name = "SQ_" + System.currentTimeMillis() + ".jpg";
         ContentResolver cr = getContentResolver();
+
         ContentValues cv = new ContentValues();
         cv.put(MediaStore.Images.Media.DISPLAY_NAME, name);
         cv.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");

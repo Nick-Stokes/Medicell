@@ -6,7 +6,7 @@ add_library(medicell_native SHARED
 
 # OpenCV headers
 set(OPENCV_INCLUDE_DIR
-        ${CMAKE_CURRENT_LIST_DIR}/../../../../opencv/sdk/native/jni/include)
+        ${CMAKE_CURRENT_LIST_DIR}/../../../..//opencv/OpenCV-android-sdk/sdk/native/jni/include)
 
 target_include_directories(medicell_native PRIVATE
         ${OPENCV_INCLUDE_DIR})

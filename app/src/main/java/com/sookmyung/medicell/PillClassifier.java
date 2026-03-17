@@ -28,18 +28,18 @@ public class PillClassifier {
     private static final int INPUT_SIZE = 224;
     private static final int NUM_SHAPES = 4;
 
-    // TFLite files
-    private static final String STAGE1_FILE = "stage1_none.tflite";
-    private static final String STAGE2_CIRCLE_FILE = "stage2_circle_none.tflite";
-    private static final String STAGE2_OVAL_FILE = "stage2_oval_none.tflite";
-    private static final String STAGE2_OBLONG_FILE = "stage2_oblong_none.tflite";
-    private static final String STAGE2_OTHER_FILE = "stage2_other_none.tflite";
+    // TFLite files (crop_only best float32)
+    private static final String STAGE1_FILE = "stage1_crop_only_best_float32.tflite";
+    private static final String STAGE2_CIRCLE_FILE = "stage2_circle_crop_only_best_float32.tflite";
+    private static final String STAGE2_OVAL_FILE = "stage2_oval_crop_only_best_float32.tflite";
+    private static final String STAGE2_OBLONG_FILE = "stage2_oblong_crop_only_best_float32.tflite";
+    private static final String STAGE2_OTHER_FILE = "stage2_other_crop_only_best_float32.tflite";
 
-    // labelmap json
-    private static final String LABELMAP_CIRCLE_FILE = "stage2_circle_labelmap.json";
-    private static final String LABELMAP_OVAL_FILE = "stage2_oval_labelmap.json";
-    private static final String LABELMAP_OBLONG_FILE = "stage2_oblong_labelmap.json";
-    private static final String LABELMAP_OTHER_FILE = "stage2_other_labelmap.json";
+    // labelmap json (crop_only)
+    private static final String LABELMAP_CIRCLE_FILE = "stage2_circle_crop_only_labelmap.json";
+    private static final String LABELMAP_OVAL_FILE = "stage2_oval_crop_only_labelmap.json";
+    private static final String LABELMAP_OBLONG_FILE = "stage2_oblong_crop_only_labelmap.json";
+    private static final String LABELMAP_OTHER_FILE = "stage2_other_crop_only_labelmap.json";
 
     // rule
     private static final float STAGE1_PROB_THRESHOLD = 0.7f;

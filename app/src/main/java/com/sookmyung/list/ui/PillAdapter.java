@@ -3,10 +3,9 @@ package com.sookmyung.list.ui;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
 import android.widget.TextView;
 
-import androidx.annotation.NonNull;
+import androidx.appcompat.widget.TooltipCompat;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.sookmyung.list.Pill;
@@ -15,86 +14,48 @@ import com.sookmyung.medicell.R;
 import java.util.ArrayList;
 import java.util.List;
 
-/** 알약 리스트 어댑터 */
+/** 알약 리스트 어댑터 (툴팁으로 효능 표시) */
 public class PillAdapter extends RecyclerView.Adapter<PillAdapter.VH> {
 
-    public interface OnItemClick {
-        void onClick(Pill pill);
-    }
-
-    public interface OnDeleteClick {
-        void onDelete(Pill pill);
-    }
+    public interface OnItemSelected { void onSelected(Pill p); }
 
     private final List<Pill> items = new ArrayList<>();
-    private final OnItemClick itemCb;
-    private final OnDeleteClick deleteCb;
+    private Pill selected;
+    private final OnItemSelected cb;
 
-    public PillAdapter(OnItemClick itemCb, OnDeleteClick deleteCb) {
-        this.itemCb = itemCb;
-        this.deleteCb = deleteCb;
-    }
+    public PillAdapter(OnItemSelected cb) { this.cb = cb; }
 
     public void submit(List<Pill> data) {
-        int oldSize = items.size();
-        if (oldSize > 0) {
-            items.clear();
-            notifyItemRangeRemoved(0, oldSize);
-        } else {
-            items.clear();
-        }
-
-        if (data != null && !data.isEmpty()) {
-            items.addAll(data);
-            notifyItemRangeInserted(0, items.size());
-        }
+        items.clear();
+        if (data != null) items.addAll(data);
+        notifyDataSetChanged();
     }
 
-    @NonNull
-    @Override
-    public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+    public Pill getSelected() { return selected; }
+
+    @Override public VH onCreateViewHolder(ViewGroup parent, int viewType) {
         View v = LayoutInflater.from(parent.getContext())
                 .inflate(R.layout.item_pill, parent, false);
         return new VH(v);
     }
 
-    @Override
-    public void onBindViewHolder(@NonNull VH h, int pos) {
+    @Override public void onBindViewHolder(VH h, int pos) {
         Pill p = items.get(pos);
-        h.tvName.setText(p.itemName);
-
+        h.tv.setText(p.itemName);
+        String tip = "효능: " + (p.className == null ? "-" : p.className);
+        TooltipCompat.setTooltipText(h.itemView, tip); // 길게 누르기/포커스 시 말풍선
+        h.itemView.setSelected(p == selected);
         h.itemView.setOnClickListener(v -> {
-            if (itemCb != null) {
-                itemCb.onClick(p);
-            }
-        });
-
-        h.tvName.setOnClickListener(v -> {
-            if (itemCb != null) {
-                itemCb.onClick(p);
-            }
-        });
-
-        h.btnDelete.setOnClickListener(v -> {
-            if (deleteCb != null) {
-                deleteCb.onDelete(p);
-            }
+            selected = p;
+            notifyDataSetChanged();
+            if (cb != null) cb.onSelected(p);
         });
     }
 
-    @Override
-    public int getItemCount() {
-        return items.size();
-    }
+    @Override public int getItemCount() { return items.size(); }
 
     static class VH extends RecyclerView.ViewHolder {
-        final TextView tvName;
-        final Button btnDelete;
-
-        VH(@NonNull View v) {
-            super(v);
-            tvName = v.findViewById(R.id.tvName);
-            btnDelete = v.findViewById(R.id.btnDeleteItem);
-        }
+        TextView tv;
+        VH(View v) { super(v); tv = v.findViewById(R.id.tvName); }
     }
 }
