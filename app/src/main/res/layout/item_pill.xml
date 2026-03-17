@@ -4,7 +4,9 @@
     android:layout_height="wrap_content"
     android:orientation="horizontal"
     android:gravity="center_vertical"
-    android:padding="8dp">
+    android:padding="8dp"
+    android:clickable="true"
+    android:focusable="true">
 
     <TextView
         android:id="@+id/tvName"
@@ -24,9 +26,9 @@
         android:layout_width="100dp"
         android:layout_height="56dp"
         android:layout_marginStart="10dp"
+        android:background="@drawable/delete_button_bg"
         android:text="@string/delete"
-        android:textSize="20sp"
-        android:textStyle="bold"
         android:textColor="#222222"
-        android:backgroundTint="#E6CCB3" />
+        android:textSize="20sp"
+        android:textStyle="bold" />
 </LinearLayout>
