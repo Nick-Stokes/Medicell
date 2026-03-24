@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="600dp"
+    android:orientation="vertical"
+    android:background="#FFFFFF"
+    android:paddingStart="24dp"
+    android:paddingTop="26dp"
+    android:paddingEnd="24dp"
+    android:paddingBottom="18dp">
+
+    <!-- 제목 -->
+    <TextView
+        android:id="@+id/tvDialogTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:includeFontPadding="false"
+        android:text="복용 시간"
+        android:textColor="#222222"
+        android:textSize="34sp"
+        android:textStyle="bold" />
+
+    <!-- 시간 선택 영역 -->
+    <FrameLayout
+        android:id="@+id/timePickerFrame"
+        android:layout_width="match_parent"
+        android:layout_height="220dp"
+        android:layout_marginTop="90dp"
+        android:clipChildren="false"
+        android:clipToPadding="false">
+
+        <LinearLayout
+            android:id="@+id/timePickerRow"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_gravity="center"
+            android:orientation="horizontal"
+            android:gravity="center_vertical|center_horizontal"
+            android:weightSum="3.2"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp"
+            android:clipChildren="false"
+            android:clipToPadding="false">
+
+            <NumberPicker
+                android:id="@+id/pickerAmPm"
+                android:layout_width="0dp"
+                android:layout_height="200dp"
+                android:layout_weight="1.1"
+                android:descendantFocusability="blocksDescendants"
+                android:fadingEdgeLength="0dp" />
+
+            <NumberPicker
+                android:id="@+id/pickerHour"
+                android:layout_width="0dp"
+                android:layout_height="200dp"
+                android:layout_weight="1.0"
+                android:descendantFocusability="blocksDescendants"
+                android:fadingEdgeLength="0dp" />
+
+            <NumberPicker
+                android:id="@+id/pickerMinute"
+                android:layout_width="0dp"
+                android:layout_height="200dp"
+                android:layout_weight="1.1"
+                android:descendantFocusability="blocksDescendants"
+                android:fadingEdgeLength="0dp" />
+        </LinearLayout>
+    </FrameLayout>
+
+    <!-- 버튼을 더 아래로 -->
+    <Space
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <!-- 하단 버튼 -->
+    <LinearLayout
+        android:id="@+id/buttonRow"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/btnClose"
+            android:layout_width="0dp"
+            android:layout_height="66dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_dialog_close_button"
+            android:text="닫기"
+            android:textAllCaps="false"
+            android:textAppearance="@style/UnifiedBottomButtonText"
+            android:textColor="#666666" />
+
+        <Space
+            android:layout_width="16dp"
+            android:layout_height="1dp" />
+
+        <Button
+            android:id="@+id/btnSelect"
+            android:layout_width="0dp"
+            android:layout_height="66dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_dialog_select_button"
+            android:text="선택"
+            android:textAllCaps="false"
+            android:textAppearance="@style/UnifiedBottomButtonText"
+            android:textColor="#222222" />
+    </LinearLayout>
+
+</LinearLayout>

@@ -1,11 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:minHeight="260dp"
+    android:layout_height="360dp"
     android:orientation="vertical"
     android:background="#FFFFFF"
-    android:paddingStart="24dp"
+    android:paddingStart="28dp"
     android:paddingTop="28dp"
     android:paddingEnd="24dp"
     android:paddingBottom="24dp">
@@ -16,38 +15,42 @@
         android:layout_height="0dp"
         android:layout_weight="1"
         android:gravity="center"
-        android:lineSpacingExtra="8dp"
+        android:lineSpacingExtra="6dp"
         android:textColor="#222222"
-        android:textSize="24sp"
+        android:textSize="28sp"
         android:textStyle="bold" />
 
     <LinearLayout
         android:id="@+id/buttonContainer"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="22dp"
-        android:gravity="center"
         android:orientation="horizontal">
 
         <Button
             android:id="@+id/btnNo"
-            android:layout_width="112dp"
-            android:layout_height="52dp"
-            android:background="@drawable/dialog_action_button"
+            android:layout_width="0dp"
+            android:layout_height="66dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_dialog_close_button"
             android:text="아니오"
-            android:textColor="#00BCD4"
-            android:textSize="20sp"
-            android:textStyle="bold" />
+            android:textAllCaps="false"
+            android:textAppearance="@style/UnifiedBottomButtonText"
+            android:textColor="#666666" />
+
+        <Space
+            android:layout_width="16dp"
+            android:layout_height="1dp" />
 
         <Button
             android:id="@+id/btnYes"
-            android:layout_width="112dp"
-            android:layout_height="52dp"
-            android:layout_marginStart="18dp"
-            android:background="@drawable/dialog_action_button"
+            android:layout_width="0dp"
+            android:layout_height="66dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_dialog_select_button"
             android:text="예"
-            android:textColor="#00BCD4"
-            android:textSize="20sp"
-            android:textStyle="bold" />
+            android:textAllCaps="false"
+            android:textAppearance="@style/UnifiedBottomButtonText"
+            android:textColor="#222222" />
     </LinearLayout>
+
 </LinearLayout>

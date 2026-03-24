@@ -1,5 +1,7 @@
 package com.sookmyung.alarm.ui;
 
+import android.util.Log;
+import android.view.Window;
 import android.Manifest;
 import android.app.AlarmManager;
 import android.app.Dialog;
@@ -7,6 +9,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Build;
@@ -14,9 +18,9 @@ import android.os.Bundle;
 import android.provider.Settings;
 import android.util.TypedValue;
 import android.view.Gravity;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.Window;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
@@ -29,8 +33,9 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
-import androidx.core.app.NotificationManagerCompat;
 import androidx.core.content.ContextCompat;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.sookmyung.alarm.Alarm;
 import com.sookmyung.alarm.AlarmScheduler;
@@ -40,7 +45,11 @@ import com.sookmyung.list.PillStorage;
 import com.sookmyung.list.ui.PillListActivity;
 import com.sookmyung.medicell.R;
 
+import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -49,99 +58,119 @@ public class AddAlarmActivity extends AppCompatActivity {
 
     private static final int REQ_POST_NOTIFICATIONS = 1001;
 
+    private TextView tvBack;
+    private View step1Container;
+    private View step2Container;
+
+    private Button btnBottom;
+
     private LinearLayout selectPillBox;
     private TextView tvSelectedPill;
-    private NumberPicker npAmPm;
-    private NumberPicker npHour;
-    private NumberPicker npMinute;
+    private TextView btnEveryDay;
+    private TextView btnManualDays;
+    private final List<TextView> dayViews = new ArrayList<>();
+    private RecyclerView rvTimes;
+    private TextView tvTimeGuide;
 
     private final List<String> pillNames = new ArrayList<>();
-    private String selectedPillName = null;
+    private String selectedPillName;
     private ListPopupWindow pillPopupWindow;
 
+    private final List<Integer> selectedDays = new ArrayList<>();
+    private boolean everyDay = true;
+    private long startDateMillis;
+    private long endDateMillis;
+    private int currentStep = 1;
+
+    private final List<TimeCardAdapter.TimeItem> timeItems = new ArrayList<>();
+    private TimeCardAdapter timeCardAdapter;
+    private String editGroupId;
+
     @Override
-    protected void onCreate(Bundle b) {
-        super.onCreate(b);
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_add_alarm);
+
+        bindViews();
+        requestNotificationPermissionIfNeeded();
+        setupDefaultDates();
+        loadPillNames();
+        setupDropdown();
+        setupDaySelection();
+        setupTimeSection();
+        loadEditDataIfNeeded();
+        updateStepUI();
+        getOnBackPressedDispatcher().addCallback(this, new androidx.activity.OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                AddAlarmActivity.this.handleBackClick();
+            }
+        });
+    }
+
+    private void bindViews() {
+        tvBack = findViewById(R.id.tvBack);
+        step1Container = findViewById(R.id.step1Container);
+        step2Container = findViewById(R.id.step2Container);
+        btnBottom = findViewById(R.id.btnBottom);
 
         selectPillBox = findViewById(R.id.selectPillBox);
         tvSelectedPill = findViewById(R.id.tvSelectedPill);
-        npAmPm = findViewById(R.id.npAmPm);
-        npHour = findViewById(R.id.npHour);
-        npMinute = findViewById(R.id.npMinute);
+        btnEveryDay = findViewById(R.id.btnEveryDay);
+        btnManualDays = findViewById(R.id.btnManualDays);
 
-        Button btnAdd = findViewById(R.id.btnAdd);
+        dayViews.clear();
+        dayViews.add(findViewById(R.id.tvMon));
+        dayViews.add(findViewById(R.id.tvTue));
+        dayViews.add(findViewById(R.id.tvWed));
+        dayViews.add(findViewById(R.id.tvThu));
+        dayViews.add(findViewById(R.id.tvFri));
+        dayViews.add(findViewById(R.id.tvSat));
+        dayViews.add(findViewById(R.id.tvSun));
 
-        requestNotificationPermissionIfNeeded();
-        loadPillNames();
+        rvTimes = findViewById(R.id.rvTimes);
+        tvTimeGuide = findViewById(R.id.tvTimeGuide);
 
-        setupAmPmPicker();
-        setupHourPicker();
-        setupMinutePicker();
+        tvBack.setOnClickListener(v -> handleBackClick());
+        findViewById(R.id.btnAddTime).setOnClickListener(v -> openWheelTimeDialog(null));
+        btnBottom.setOnClickListener(v -> onBottomButtonClicked());
+    }
 
-        stylePickerInput(npAmPm);
-        stylePickerInput(npHour);
-        stylePickerInput(npMinute);
+    private void setupDefaultDates() {
+        Calendar today = Calendar.getInstance();
+        zeroDate(today);
+        startDateMillis = today.getTimeInMillis();
 
-        if (pillNames.isEmpty()) {
-            showNoPillDialog();
-        } else {
-            selectedPillName = pillNames.get(0);
-            tvSelectedPill.setText(selectedPillName);
-        }
-
-        selectPillBox.setOnClickListener(v -> {
-            if (pillNames.isEmpty()) {
-                showNoPillDialog();
-                return;
-            }
-            showPillDropdown();
-        });
-
-        btnAdd.setOnClickListener(v -> {
-            if (pillNames.isEmpty()) {
-                showNoPillDialog();
-                return;
-            }
-
-            if (!checkAndRequestAlarmPermissions()) {
-                return;
-            }
-
-            if (selectedPillName == null || selectedPillName.trim().isEmpty()) {
-                Toast.makeText(this, "약을 선택해주세요.", Toast.LENGTH_SHORT).show();
-                return;
-            }
-
-            int amPm = npAmPm.getValue();
-            int hour12 = npHour.getValue();
-            int minute = npMinute.getValue();
-
-            int hour24;
-            if (amPm == 0) {
-                hour24 = (hour12 == 12) ? 0 : hour12;
-            } else {
-                hour24 = (hour12 == 12) ? 12 : hour12 + 12;
-            }
-
-            Alarm a = new Alarm(UUID.randomUUID().toString(), selectedPillName, hour24, minute);
-            AlarmStorage.add(this, a);
-            AlarmScheduler.scheduleDaily(this, a);
-
-            Toast.makeText(this, "알람이 추가되었습니다.", Toast.LENGTH_SHORT).show();
-            finish();
-        });
+        Calendar twoYearsLater = (Calendar) today.clone();
+        twoYearsLater.add(Calendar.DAY_OF_YEAR, 730);
+        endDateMillis = twoYearsLater.getTimeInMillis();
     }
 
     private void loadPillNames() {
         pillNames.clear();
-
         List<Pill> pills = PillStorage.load(this);
-        for (Pill p : pills) {
-            if (p != null && p.itemName != null && !p.itemName.trim().isEmpty()) {
-                pillNames.add(p.itemName);
+        for (Pill pill : pills) {
+            if (pill != null && pill.itemName != null && !pill.itemName.trim().isEmpty()) {
+                if (!pillNames.contains(pill.itemName)) {
+                    pillNames.add(pill.itemName);
+                }
             }
         }
+    }
+
+    private void setupDropdown() {
+        if (pillNames.isEmpty()) {
+            tvSelectedPill.setText("복용 중인 약이 없습니다");
+            selectPillBox.setOnClickListener(v -> showNoPillDialog());
+            return;
+        }
+
+        if (selectedPillName == null) {
+            selectedPillName = pillNames.get(0);
+        }
+        tvSelectedPill.setText(selectedPillName);
+        markPillSelected(true);
+        selectPillBox.setOnClickListener(v -> showPillDropdown());
     }
 
     private void showPillDropdown() {
@@ -149,25 +178,44 @@ public class AddAlarmActivity extends AppCompatActivity {
             pillPopupWindow.dismiss();
         }
 
-        ArrayAdapter<String> adapter = new ArrayAdapter<String>(
-                this,
-                android.R.layout.simple_list_item_1,
-                pillNames
-        ) {
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, 0, pillNames) {
             @NonNull
             @Override
             public View getView(int position, View convertView, @NonNull ViewGroup parent) {
-                View view = super.getView(position, convertView, parent);
-
-                if (view instanceof TextView) {
-                    TextView tv = (TextView) view;
-                    tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 22);
-                    tv.setTypeface(Typeface.DEFAULT_BOLD);
-                    tv.setTextColor(Color.parseColor("#222222"));
-                    tv.setPadding(24, 24, 24, 24);
-                    tv.setMaxLines(2);
+                View view = convertView;
+                if (view == null) {
+                    view = LayoutInflater.from(getContext()).inflate(
+                            R.layout.item_pill_dropdown,
+                            parent,
+                            false
+                    );
                 }
 
+                LinearLayout rowRoot = view.findViewById(R.id.dropdownRowRoot);
+                TextView tvName = view.findViewById(R.id.tvPillName);
+                TextView tvCheck = view.findViewById(R.id.tvSelectedCheck);
+                View divider = view.findViewById(R.id.dropdownDivider);
+
+                String pillName = getItem(position);
+                boolean isSelected = pillName != null && pillName.equals(selectedPillName);
+                boolean isLast = position == getCount() - 1;
+
+                tvName.setText(pillName);
+                rowRoot.setBackgroundResource(
+                        getDropdownItemBackgroundRes(position, getCount(), isSelected)
+                );
+
+                if (isSelected) {
+                    tvCheck.setVisibility(View.VISIBLE);
+                    tvName.setTextColor(Color.parseColor("#222222"));
+                    tvName.setTypeface(Typeface.DEFAULT_BOLD);
+                } else {
+                    tvCheck.setVisibility(View.INVISIBLE);
+                    tvName.setTextColor(Color.parseColor("#222222"));
+                    tvName.setTypeface(Typeface.DEFAULT_BOLD);
+                }
+
+                divider.setVisibility(isLast ? View.GONE : View.VISIBLE);
                 return view;
             }
         };
@@ -176,41 +224,576 @@ public class AddAlarmActivity extends AppCompatActivity {
         pillPopupWindow.setAnchorView(selectPillBox);
         pillPopupWindow.setAdapter(adapter);
         pillPopupWindow.setModal(true);
-        pillPopupWindow.setBackgroundDrawable(new ColorDrawable(Color.WHITE));
-        pillPopupWindow.setHorizontalOffset(0);
-        pillPopupWindow.setVerticalOffset(8);
+        pillPopupWindow.setBackgroundDrawable(
+                ContextCompat.getDrawable(this, R.drawable.bg_pill_dropdown_popup)
+        );
         pillPopupWindow.setWidth(selectPillBox.getWidth());
-        pillPopupWindow.setHeight(ViewGroup.LayoutParams.WRAP_CONTENT);
+        pillPopupWindow.setHorizontalOffset(0);
 
+        int verticalOffset = dpToPx(6);
+        pillPopupWindow.setVerticalOffset(verticalOffset);
+        pillPopupWindow.setHeight(getDropdownPopupHeight(selectPillBox, verticalOffset, pillNames.size()));
+
+        pillPopupWindow.setOnDismissListener(() -> markPillSelected(true));
         pillPopupWindow.setOnItemClickListener((parent, view, position, id) -> {
             selectedPillName = pillNames.get(position);
             tvSelectedPill.setText(selectedPillName);
+            markPillSelected(true);
             pillPopupWindow.dismiss();
         });
 
         selectPillBox.post(() -> {
             pillPopupWindow.setWidth(selectPillBox.getWidth());
+            pillPopupWindow.setHeight(getDropdownPopupHeight(selectPillBox, verticalOffset, pillNames.size()));
+            markPillSelected(true);
             pillPopupWindow.show();
         });
+    }
+
+    private int getDropdownItemBackgroundRes(int position, int count, boolean isSelected) {
+        boolean isSingle = count == 1;
+        boolean isFirst = position == 0;
+        boolean isLast = position == count - 1;
+
+        if (isSelected) {
+            if (isSingle) return R.drawable.bg_dropdown_item_selected_single;
+            if (isFirst) return R.drawable.bg_dropdown_item_selected_top;
+            if (isLast) return R.drawable.bg_dropdown_item_selected_bottom;
+            return R.drawable.bg_dropdown_item_selected_middle;
+        } else {
+            if (isSingle) return R.drawable.bg_dropdown_item_single;
+            if (isFirst) return R.drawable.bg_dropdown_item_top;
+            if (isLast) return R.drawable.bg_dropdown_item_bottom;
+            return R.drawable.bg_dropdown_item_middle;
+        }
+    }
+
+    private int getDropdownPopupHeight(View anchor, int verticalOffsetPx, int itemCount) {
+        Rect windowFrame = new Rect();
+        getWindow().getDecorView().getWindowVisibleDisplayFrame(windowFrame);
+
+        int[] location = new int[2];
+        anchor.getLocationOnScreen(location);
+
+        int anchorBottomOnScreen = location[1] + anchor.getHeight();
+        int spaceBelow = windowFrame.bottom - (anchorBottomOnScreen + verticalOffsetPx);
+
+        int popupOuterMargin = dpToPx(8);
+        int availableHeight = Math.max(spaceBelow - popupOuterMargin, dpToPx(160));
+
+        int rowHeight = dpToPx(120);
+        int dividerHeight = dpToPx(1);
+        int popupVerticalPadding = dpToPx(8);
+
+        int contentHeight;
+        if (itemCount <= 0) {
+            contentHeight = dpToPx(160);
+        } else {
+            contentHeight = (rowHeight * itemCount)
+                    + (dividerHeight * Math.max(itemCount - 1, 0))
+                    + popupVerticalPadding;
+        }
+
+        return Math.min(contentHeight, availableHeight);
+    }
+
+    private void setupDaySelection() {
+        btnEveryDay.setOnClickListener(v -> {
+            everyDay = true;
+            selectedDays.clear();
+            updateDayModeUI();
+        });
+
+        btnManualDays.setOnClickListener(v -> {
+            everyDay = false;
+            if (selectedDays.isEmpty()) {
+                selectedDays.add(Calendar.MONDAY);
+            }
+            updateDayModeUI();
+        });
+
+        int[] dayConsts = new int[]{
+                Calendar.MONDAY,
+                Calendar.TUESDAY,
+                Calendar.WEDNESDAY,
+                Calendar.THURSDAY,
+                Calendar.FRIDAY,
+                Calendar.SATURDAY,
+                Calendar.SUNDAY
+        };
+
+        for (int i = 0; i < dayViews.size(); i++) {
+            final int dayConst = dayConsts[i];
+            TextView dayView = dayViews.get(i);
+            dayView.setOnClickListener(v -> {
+                if (everyDay) return;
+
+                if (selectedDays.contains(dayConst)) {
+                    if (selectedDays.size() > 1) {
+                        selectedDays.remove((Integer) dayConst);
+                    }
+                } else {
+                    selectedDays.add(dayConst);
+                }
+                updateDayModeUI();
+            });
+        }
+
+        updateDayModeUI();
+    }
+
+    private void setupTimeSection() {
+        rvTimes.setLayoutManager(new LinearLayoutManager(this));
+        rvTimes.setNestedScrollingEnabled(false);
+
+        timeCardAdapter = new TimeCardAdapter(new TimeCardAdapter.Listener() {
+            @Override
+            public void onEdit(TimeCardAdapter.TimeItem item) {
+                openWheelTimeDialog(item);
+            }
+
+            @Override
+            public void onDelete(TimeCardAdapter.TimeItem item) {
+                timeItems.remove(item);
+                sortTimes();
+                refreshTimeList();
+            }
+        });
+
+        rvTimes.setAdapter(timeCardAdapter);
+
+        findViewById(R.id.btnAddTime).setOnClickListener(v -> openWheelTimeDialog(null));
+
+        refreshTimeList();
+    }
+
+    private void loadEditDataIfNeeded() {
+        editGroupId = getIntent().getStringExtra("groupId");
+        if (editGroupId == null || editGroupId.trim().isEmpty()) {
+            return;
+        }
+
+        List<Alarm> group = AlarmStorage.findByGroup(this, editGroupId);
+        if (group.isEmpty()) {
+            return;
+        }
+
+        Alarm first = group.get(0);
+
+        selectedPillName = first.pillName;
+        tvSelectedPill.setText(selectedPillName);
+        markPillSelected(true);
+
+        startDateMillis = first.startDateMillis;
+        endDateMillis = first.endDateMillis;
+
+        everyDay = first.everyDay;
+        selectedDays.clear();
+        if (first.daysOfWeek != null) {
+            selectedDays.addAll(first.daysOfWeek);
+        }
+        if (!everyDay && selectedDays.isEmpty()) {
+            selectedDays.add(Calendar.MONDAY);
+        }
+        updateDayModeUI();
+
+        timeItems.clear();
+        for (Alarm alarm : group) {
+            timeItems.add(new TimeCardAdapter.TimeItem(alarm.hour, alarm.minute));
+        }
+        sortTimes();
+        refreshTimeList();
+    }
+
+    private void handleBackClick() {
+        if (currentStep == 1) {
+            finish();
+        } else {
+            currentStep = 1;
+            updateStepUI();
+        }
+    }
+
+
+    private void onBottomButtonClicked() {
+        if (currentStep == 1) {
+            if (pillNames.isEmpty()) {
+                showNoPillDialog();
+                return;
+            }
+
+            if (selectedPillName == null || selectedPillName.trim().isEmpty()) {
+                Toast.makeText(this, "약을 선택해주세요.", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            if (!everyDay && selectedDays.isEmpty()) {
+                Toast.makeText(this, "직접 선택 시 요일을 1개 이상 선택해주세요.", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            currentStep = 2;
+            updateStepUI();
+            return;
+        }
+
+        if (timeItems.isEmpty()) {
+            showLargeMessageDialog("복용 시간을", "추가해주세요");
+            return;
+        }
+
+        saveAlarmGroup();
+    }
+
+    private void saveAlarmGroup() {
+        if (!checkAndRequestAlarmPermissions()) {
+            return;
+        }
+
+        String groupId = editGroupId != null ? editGroupId : UUID.randomUUID().toString();
+        List<Integer> daysToSave = everyDay ? new ArrayList<>() : new ArrayList<>(selectedDays);
+        List<Alarm> alarms = new ArrayList<>();
+
+        for (TimeCardAdapter.TimeItem item : timeItems) {
+            alarms.add(new Alarm(
+                    UUID.randomUUID().toString(),
+                    groupId,
+                    selectedPillName,
+                    item.hour,
+                    item.minute,
+                    startDateMillis,
+                    endDateMillis,
+                    everyDay,
+                    daysToSave
+            ));
+        }
+
+        AlarmScheduler.cancelGroup(this, groupId);
+        AlarmStorage.replaceGroup(this, groupId, alarms);
+
+        for (Alarm alarm : alarms) {
+            AlarmScheduler.scheduleNext(this, alarm);
+        }
+
+        Toast.makeText(
+                this,
+                editGroupId == null ? "복용 알림이 저장되었습니다." : "복용 알림이 수정되었습니다.",
+                Toast.LENGTH_SHORT
+        ).show();
+
+        finish();
+    }
+
+    private void refreshTimeList() {
+        timeCardAdapter.submit(new ArrayList<>(timeItems));
+
+        boolean hasItems = !timeItems.isEmpty();
+
+        rvTimes.setVisibility(hasItems ? View.VISIBLE : View.GONE);
+        tvTimeGuide.setVisibility(hasItems ? View.GONE : View.VISIBLE);
+
+        if (!hasItems) {
+            tvTimeGuide.setText("알림을 1개 이상\n추가해주세요");
+        }
+    }
+
+    private void sortTimes() {
+        Collections.sort(timeItems, new Comparator<TimeCardAdapter.TimeItem>() {
+            @Override
+            public int compare(TimeCardAdapter.TimeItem o1, TimeCardAdapter.TimeItem o2) {
+                if (o1.hour != o2.hour) {
+                    return Integer.compare(o1.hour, o2.hour);
+                }
+                return Integer.compare(o1.minute, o2.minute);
+            }
+        });
+    }
+
+    private void updateStepUI() {
+        step1Container.setVisibility(currentStep == 1 ? View.VISIBLE : View.GONE);
+        step2Container.setVisibility(currentStep == 2 ? View.VISIBLE : View.GONE);
+
+        if (currentStep == 1) {
+            btnBottom.setText("다음");
+            btnBottom.setEnabled(true);
+        } else {
+            btnBottom.setText("저장");
+            btnBottom.setEnabled(true);
+        }
+    }
+
+
+
+    private void updateDayModeUI() {
+        btnEveryDay.setSelected(everyDay);
+        btnManualDays.setSelected(!everyDay);
+        btnEveryDay.setTextColor(Color.parseColor("#222222"));
+        btnManualDays.setTextColor(Color.parseColor("#222222"));
+
+        int[] dayConsts = new int[]{
+                Calendar.MONDAY,
+                Calendar.TUESDAY,
+                Calendar.WEDNESDAY,
+                Calendar.THURSDAY,
+                Calendar.FRIDAY,
+                Calendar.SATURDAY,
+                Calendar.SUNDAY
+        };
+
+        for (int i = 0; i < dayViews.size(); i++) {
+            TextView dayView = dayViews.get(i);
+            int dayConst = dayConsts[i];
+            boolean selected = !everyDay && selectedDays.contains(dayConst);
+
+            dayView.setEnabled(!everyDay);
+            dayView.setSelected(selected);
+
+            if (everyDay) {
+                dayView.setAlpha(1f);
+                dayView.setTextColor(Color.parseColor("#A9A39B"));
+            } else {
+                dayView.setAlpha(1f);
+                dayView.setTextColor(selected
+                        ? Color.parseColor("#222222")
+                        : Color.parseColor("#A9A39B"));
+            }
+        }
+    }
+
+    private void markPillSelected(boolean selected) {
+        selectPillBox.setBackgroundResource(
+                selected ? R.drawable.bg_select_box_active : R.drawable.bg_select_box
+        );
+        if (currentStep == 1) {
+            btnBottom.setEnabled(selected);
+        }
+    }
+
+    private void styleTimePickers(NumberPicker... pickers) {
+        for (NumberPicker picker : pickers) {
+            picker.setDescendantFocusability(NumberPicker.FOCUS_BLOCK_DESCENDANTS);
+            picker.setWrapSelectorWheel(false);
+            picker.setVerticalFadingEdgeEnabled(false);
+            picker.setFadingEdgeLength(0);
+
+            applyPickerAppearance(picker);
+
+            picker.setOnValueChangedListener((numberPicker, oldVal, newVal) ->
+                    applyPickerAppearance(numberPicker));
+
+            picker.setOnScrollListener((numberPicker, scrollState) -> {
+                if (scrollState == NumberPicker.OnScrollListener.SCROLL_STATE_IDLE) {
+                    applyPickerAppearance(numberPicker);
+                }
+            });
+
+            picker.post(() -> applyPickerAppearance(picker));
+        }
+    }
+
+    private void applyPickerAppearance(NumberPicker picker) {
+        hideNumberPickerDivider(picker);
+        setNumberPickerTextSize(picker, 62f);
+        picker.requestLayout();
+        picker.invalidate();
+    }
+
+
+
+    private void setNumberPickerTextSize(NumberPicker picker, float textSizeSp) {
+        try {
+            int textSizePx = (int) TypedValue.applyDimension(
+                    TypedValue.COMPLEX_UNIT_SP,
+                    textSizeSp,
+                    getResources().getDisplayMetrics()
+            );
+
+            Field selectorWheelPaintField = NumberPicker.class.getDeclaredField("mSelectorWheelPaint");
+            selectorWheelPaintField.setAccessible(true);
+            Paint selectorWheelPaint = (Paint) selectorWheelPaintField.get(picker);
+            if (selectorWheelPaint != null) {
+                selectorWheelPaint.setTextSize(textSizePx);
+                selectorWheelPaint.setTypeface(Typeface.DEFAULT_BOLD);
+                selectorWheelPaint.setColor(Color.parseColor("#222222"));
+            }
+
+            Field inputTextField = NumberPicker.class.getDeclaredField("mInputText");
+            inputTextField.setAccessible(true);
+            EditText inputText = (EditText) inputTextField.get(picker);
+            if (inputText != null) {
+                inputText.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSizeSp);
+                inputText.setTypeface(Typeface.DEFAULT_BOLD);
+                inputText.setTextColor(Color.parseColor("#222222"));
+                inputText.setGravity(Gravity.CENTER);
+                inputText.setIncludeFontPadding(false);
+            }
+
+            for (int i = 0; i < picker.getChildCount(); i++) {
+                View child = picker.getChildAt(i);
+                if (child instanceof EditText) {
+                    EditText editText = (EditText) child;
+                    editText.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSizeSp);
+                    editText.setTypeface(Typeface.DEFAULT_BOLD);
+                    editText.setTextColor(Color.parseColor("#222222"));
+                    editText.setGravity(Gravity.CENTER);
+                    editText.setIncludeFontPadding(false);
+                }
+            }
+
+            picker.requestLayout();
+            picker.invalidate();
+        } catch (Exception e) {
+            Log.e("AddAlarmActivity", "setNumberPickerTextSize error", e);
+        }
+    }
+
+    private void hideNumberPickerDivider(NumberPicker picker) {
+        try {
+            Field selectionDividerField = NumberPicker.class.getDeclaredField("mSelectionDivider");
+            selectionDividerField.setAccessible(true);
+            selectionDividerField.set(picker, new ColorDrawable(Color.TRANSPARENT));
+
+            Field selectionDividerHeightField = NumberPicker.class.getDeclaredField("mSelectionDividerHeight");
+            selectionDividerHeightField.setAccessible(true);
+            selectionDividerHeightField.setInt(picker, 0);
+
+            picker.invalidate();
+            picker.requestLayout();
+        } catch (Exception e) {
+            Log.e("AddAlarmActivity", "hideNumberPickerDivider error", e);
+        }
+    }
+
+    private void openWheelTimeDialog(TimeCardAdapter.TimeItem editItem) {
+        Dialog dialog = new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog.setContentView(R.layout.dialog_wheel_time);
+        dialog.setCancelable(true);
+
+        NumberPicker pickerAmPm = dialog.findViewById(R.id.pickerAmPm);
+        NumberPicker pickerHour = dialog.findViewById(R.id.pickerHour);
+        NumberPicker pickerMinute = dialog.findViewById(R.id.pickerMinute);
+        Button btnClose = dialog.findViewById(R.id.btnClose);
+        Button btnSelect = dialog.findViewById(R.id.btnSelect);
+
+        pickerAmPm.setScaleX(1.53f);
+        pickerAmPm.setScaleY(1.53f);
+
+        pickerHour.setScaleX(1.53f);
+        pickerHour.setScaleY(1.53f);
+
+        pickerMinute.setScaleX(1.53f);
+        pickerMinute.setScaleY(1.53f);
+
+        pickerAmPm.setMinValue(0);
+        pickerAmPm.setMaxValue(1);
+        pickerAmPm.setDisplayedValues(new String[]{"오전", "오후"});
+        pickerAmPm.setWrapSelectorWheel(false);
+
+        pickerHour.setMinValue(1);
+        pickerHour.setMaxValue(12);
+        pickerHour.setWrapSelectorWheel(false);
+
+        String[] minuteTexts = new String[60];
+        for (int i = 0; i < 60; i++) {
+            minuteTexts[i] = String.format(Locale.getDefault(), "%02d", i);
+        }
+        pickerMinute.setMinValue(0);
+        pickerMinute.setMaxValue(59);
+        pickerMinute.setDisplayedValues(minuteTexts);
+        pickerMinute.setWrapSelectorWheel(false);
+
+        int hour24 = editItem != null ? editItem.hour : 8;
+        int minute = editItem != null ? editItem.minute : 0;
+        int amPmIndex = hour24 < 12 ? 0 : 1;
+        int hour12 = hour24 % 12;
+        if (hour12 == 0) hour12 = 12;
+
+        pickerAmPm.setValue(amPmIndex);
+        pickerHour.setValue(hour12);
+        pickerMinute.setValue(minute);
+
+        styleTimePickers(pickerAmPm, pickerHour, pickerMinute);
+
+        dialog.setOnShowListener(d -> {
+            applyPickerAppearance(pickerAmPm);
+            applyPickerAppearance(pickerHour);
+            applyPickerAppearance(pickerMinute);
+        });
+
+
+        btnClose.setOnClickListener(v -> dialog.dismiss());
+
+        btnSelect.setOnClickListener(v -> {
+            int selectedAmPm = pickerAmPm.getValue();
+            int selectedHour12 = pickerHour.getValue();
+            int selectedMinute = pickerMinute.getValue();
+
+            int convertedHour24;
+            if (selectedAmPm == 0) {
+                convertedHour24 = selectedHour12 == 12 ? 0 : selectedHour12;
+            } else {
+                convertedHour24 = selectedHour12 == 12 ? 12 : selectedHour12 + 12;
+            }
+
+            if (editItem != null) {
+                timeItems.remove(editItem);
+            }
+            timeItems.add(new TimeCardAdapter.TimeItem(convertedHour24, selectedMinute));
+            sortTimes();
+            refreshTimeList();
+            dialog.dismiss();
+        });
+
+        showCenteredDialog(dialog);
+    }
+
+    private void showLargeMessageDialog(String line1, String line2) {
+        Dialog dialog = new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog.setContentView(R.layout.dialog_large_message);
+        dialog.setCancelable(true);
+
+        TextView tvLine1 = dialog.findViewById(R.id.tvLine1);
+        TextView tvLine2 = dialog.findViewById(R.id.tvLine2);
+        Button btnConfirm = dialog.findViewById(R.id.btnConfirm);
+
+        tvLine1.setText(line1);
+
+        if (line2 != null && !line2.trim().isEmpty()) {
+            tvLine2.setText(line2);
+            tvLine2.setVisibility(View.VISIBLE);
+        } else {
+            tvLine2.setVisibility(View.GONE);
+        }
+
+        btnConfirm.setOnClickListener(v -> dialog.dismiss());
+
+        dialog.show();
+
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+
+            int width = (int) (getResources().getDisplayMetrics().widthPixels * 0.90f);
+            dialog.getWindow().setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT);
+            dialog.getWindow().setGravity(Gravity.CENTER);
+        }
     }
 
     private void showNoPillDialog() {
         Dialog dialog = new Dialog(this);
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
-        dialog.setContentView(R.layout.dialog_add_pill_confirm);
+        dialog.setContentView(R.layout.dialog_large_message);
         dialog.setCancelable(false);
 
-        TextView tvMessage = dialog.findViewById(R.id.tvMessage);
-        Button btnNo = dialog.findViewById(R.id.btnNo);
-        Button btnYes = dialog.findViewById(R.id.btnYes);
-        LinearLayout buttonContainer = dialog.findViewById(R.id.buttonContainer);
+        TextView tvLine1 = dialog.findViewById(R.id.tvLine1);
+        TextView tvLine2 = dialog.findViewById(R.id.tvLine2);
+        Button btnConfirm = dialog.findViewById(R.id.btnConfirm);
 
-        tvMessage.setText("복용 알약 리스트에\n먼저 약을 추가해주세요.");
-        btnNo.setVisibility(View.GONE);
-        btnYes.setText("확인");
-        buttonContainer.setGravity(Gravity.CENTER);
+        tvLine1.setText("복용 알약 리스트에");
+        tvLine2.setText("먼저 약을 추가해주세요");
 
-        btnYes.setOnClickListener(v -> {
+        btnConfirm.setOnClickListener(v -> {
             dialog.dismiss();
             startActivity(new Intent(this, PillListActivity.class));
             finish();
@@ -219,8 +802,21 @@ public class AddAlarmActivity extends AppCompatActivity {
         dialog.show();
 
         if (dialog.getWindow() != null) {
-            int width = (int) (getResources().getDisplayMetrics().widthPixels * 0.92f);
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+
+            int width = (int) (getResources().getDisplayMetrics().widthPixels * 0.90f);
             dialog.getWindow().setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT);
+            dialog.getWindow().setGravity(Gravity.CENTER);
+        }
+    }
+
+    private void showCenteredDialog(Dialog dialog) {
+        dialog.show();
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            int width = (int) (getResources().getDisplayMetrics().widthPixels * 0.89f);
+            dialog.getWindow().setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT);
+            dialog.getWindow().setGravity(Gravity.CENTER);
         }
     }
 
@@ -231,31 +827,24 @@ public class AddAlarmActivity extends AppCompatActivity {
                             == PackageManager.PERMISSION_GRANTED;
 
             if (!notificationGranted) {
-                Toast.makeText(this, "알림 권한을 먼저 허용해주세요.", Toast.LENGTH_SHORT).show();
                 ActivityCompat.requestPermissions(
                         this,
                         new String[]{Manifest.permission.POST_NOTIFICATIONS},
                         REQ_POST_NOTIFICATIONS
                 );
+                Toast.makeText(this, "알림 권한을 허용해주세요.", Toast.LENGTH_SHORT).show();
                 return false;
             }
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             AlarmManager am = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
-
             if (am != null && !am.canScheduleExactAlarms()) {
                 Toast.makeText(this, "정확한 알람 권한을 허용해주세요.", Toast.LENGTH_LONG).show();
-                Intent intent = new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM);
-                startActivity(intent);
+                startActivity(new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM));
                 return false;
             }
         }
-
-        if (!NotificationManagerCompat.from(this).areNotificationsEnabled()) {
-            Toast.makeText(this, "앱 알림이 꺼져 있습니다. 설정에서 켜주세요.", Toast.LENGTH_LONG).show();
-        }
-
         return true;
     }
 
@@ -272,57 +861,14 @@ public class AddAlarmActivity extends AppCompatActivity {
         }
     }
 
-    private void setupAmPmPicker() {
-        npAmPm.setMinValue(0);
-        npAmPm.setMaxValue(1);
-        npAmPm.setDisplayedValues(new String[]{"오전", "오후"});
-        npAmPm.setWrapSelectorWheel(false);
-        npAmPm.setDescendantFocusability(NumberPicker.FOCUS_BLOCK_DESCENDANTS);
-        npAmPm.setValue(0);
-        npAmPm.setOnValueChangedListener((picker, oldVal, newVal) ->
-                picker.post(() -> stylePickerInput(picker)));
+    private void zeroDate(Calendar calendar) {
+        calendar.set(Calendar.HOUR_OF_DAY, 0);
+        calendar.set(Calendar.MINUTE, 0);
+        calendar.set(Calendar.SECOND, 0);
+        calendar.set(Calendar.MILLISECOND, 0);
     }
 
-    private void setupHourPicker() {
-        npHour.setMinValue(1);
-        npHour.setMaxValue(12);
-        npHour.setWrapSelectorWheel(true);
-        npHour.setDescendantFocusability(NumberPicker.FOCUS_BLOCK_DESCENDANTS);
-        npHour.setValue(8);
-        npHour.setOnValueChangedListener((picker, oldVal, newVal) ->
-                picker.post(() -> stylePickerInput(picker)));
-    }
-
-    private void setupMinutePicker() {
-        npMinute.setMinValue(0);
-        npMinute.setMaxValue(59);
-        npMinute.setFormatter(value -> String.format(Locale.getDefault(), "%02d", value));
-        npMinute.setWrapSelectorWheel(true);
-        npMinute.setDescendantFocusability(NumberPicker.FOCUS_BLOCK_DESCENDANTS);
-        npMinute.setValue(0);
-        npMinute.setOnValueChangedListener((picker, oldVal, newVal) ->
-                picker.post(() -> stylePickerInput(picker)));
-    }
-
-    private void stylePickerInput(NumberPicker picker) {
-        int childCount = picker.getChildCount();
-
-        for (int i = 0; i < childCount; i++) {
-            View child = picker.getChildAt(i);
-
-            if (child instanceof EditText) {
-                EditText editText = (EditText) child;
-                editText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 24);
-                editText.setTextColor(Color.BLACK);
-                editText.setTypeface(Typeface.DEFAULT_BOLD);
-                editText.setGravity(Gravity.CENTER);
-                editText.setFocusable(false);
-                editText.setClickable(false);
-                editText.setLongClickable(false);
-                editText.setCursorVisible(false);
-            }
-        }
-
-        picker.invalidate();
+    private int dpToPx(int dp) {
+        return Math.round(getResources().getDisplayMetrics().density * dp);
     }
 }

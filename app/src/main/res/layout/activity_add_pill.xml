@@ -8,23 +8,31 @@
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="56dp"
+        android:layout_height="64dp"
         android:layout_marginStart="12dp"
-        android:layout_marginTop="6dp"
+        android:layout_marginTop="18dp"
         android:layout_marginEnd="12dp"
-        android:background="#D7D7D7"
+        android:background="@drawable/bg_pill_search_box"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingStart="14dp"
-        android:paddingEnd="14dp">
+        android:paddingStart="20dp"
+        android:paddingEnd="18dp">
+
+        <ImageView
+            android:id="@+id/ivSearch"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:contentDescription="검색"
+            android:src="@drawable/ic_search_white" />
 
         <EditText
             android:id="@+id/etQuery"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:layout_marginStart="12dp"
             android:background="@android:color/transparent"
-            android:hint="알약 이름 검색"
+            android:hint="약 검색"
             android:imeOptions="actionSearch"
             android:inputType="text"
             android:maxLines="1"
@@ -32,15 +40,7 @@
             android:singleLine="true"
             android:textColor="#222222"
             android:textColorHint="#666666"
-            android:textSize="20sp" />
-
-        <ImageView
-            android:id="@+id/ivSearch"
-            android:layout_width="28dp"
-            android:layout_height="28dp"
-            android:contentDescription="검색"
-            android:padding="2dp"
-            android:src="@android:drawable/ic_menu_search" />
+            android:textSize="22sp" />
     </LinearLayout>
 
     <ProgressBar

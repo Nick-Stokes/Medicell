@@ -29,29 +29,60 @@ public class AlarmStorage {
                 .apply();
     }
 
-    public static void add(Context ctx, Alarm a) {
+    public static void add(Context ctx, Alarm alarm) {
         List<Alarm> list = load(ctx);
-        list.add(a);
+        list.add(alarm);
         save(ctx, list);
     }
 
-    public static void remove(Context ctx, Alarm a) {
+    public static void addAll(Context ctx, List<Alarm> alarms) {
         List<Alarm> list = load(ctx);
+        list.addAll(alarms);
+        save(ctx, list);
+    }
+
+    public static Alarm find(Context ctx, String id) {
+        for (Alarm alarm : load(ctx)) {
+            if (alarm.id != null && alarm.id.equals(id)) {
+                return alarm;
+            }
+        }
+        return null;
+    }
+
+    public static List<Alarm> findByGroup(Context ctx, String groupId) {
+        List<Alarm> result = new ArrayList<>();
+        if (groupId == null) {
+            return result;
+        }
+        for (Alarm alarm : load(ctx)) {
+            if (groupId.equals(alarm.groupId)) {
+                result.add(alarm);
+            }
+        }
+        return result;
+    }
+
+    public static void removeByGroup(Context ctx, String groupId) {
         List<Alarm> out = new ArrayList<>();
-        for (Alarm x : list) {
-            if (x.id == null || !x.id.equals(a.id)) {
-                out.add(x);
+        for (Alarm alarm : load(ctx)) {
+            if (groupId == null || !groupId.equals(alarm.groupId)) {
+                out.add(alarm);
             }
         }
         save(ctx, out);
     }
 
-    public static Alarm find(Context ctx, String id) {
-        for (Alarm a : load(ctx)) {
-            if (a.id != null && a.id.equals(id)) {
-                return a;
+    public static void replaceGroup(Context ctx, String groupId, List<Alarm> alarms) {
+        List<Alarm> out = new ArrayList<>();
+        for (Alarm alarm : load(ctx)) {
+            if (groupId == null || !groupId.equals(alarm.groupId)) {
+                out.add(alarm);
             }
         }
-        return null;
+        if (alarms != null) {
+            out.addAll(alarms);
+        }
+        save(ctx, out);
     }
 }

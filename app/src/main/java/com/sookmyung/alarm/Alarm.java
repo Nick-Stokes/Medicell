@@ -1,13 +1,40 @@
 package com.sookmyung.alarm;
 
-public class Alarm {
-    public String id;       // 고유 ID (알람 요청코드)
-    public String pillName; // 알림 대상 약 이름
-    public int hour;        // 0~23
-    public int minute;      // 0~59
+import java.util.ArrayList;
+import java.util.List;
 
-    public Alarm() {}
-    public Alarm(String id, String pillName, int hour, int minute) {
-        this.id = id; this.pillName = pillName; this.hour = hour; this.minute = minute;
+public class Alarm {
+    public String id;
+    public String groupId;
+    public String pillName;
+    public int hour;
+    public int minute;
+    public long startDateMillis;
+    public long endDateMillis;
+    public boolean everyDay;
+    public List<Integer> daysOfWeek;
+
+    public Alarm() {
+        daysOfWeek = new ArrayList<>();
+    }
+
+    public Alarm(String id,
+                 String groupId,
+                 String pillName,
+                 int hour,
+                 int minute,
+                 long startDateMillis,
+                 long endDateMillis,
+                 boolean everyDay,
+                 List<Integer> daysOfWeek) {
+        this.id = id;
+        this.groupId = groupId;
+        this.pillName = pillName;
+        this.hour = hour;
+        this.minute = minute;
+        this.startDateMillis = startDateMillis;
+        this.endDateMillis = endDateMillis;
+        this.everyDay = everyDay;
+        this.daysOfWeek = (daysOfWeek != null) ? new ArrayList<>(daysOfWeek) : new ArrayList<>();
     }
 }

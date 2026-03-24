@@ -1,39 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/pillCardRoot"
+    android:id="@+id/timeCardRoot"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginBottom="10dp"
     android:background="@drawable/bg_time_card"
-    android:orientation="horizontal"
     android:gravity="center_vertical"
-    android:padding="8dp"
-    android:clickable="true"
-    android:focusable="true">
+    android:orientation="horizontal"
+    android:padding="12dp">
 
-    <!-- 알약 이름 -->
     <TextView
-        android:id="@+id/tvName"
+        android:id="@+id/tvTimeValue"
         android:layout_width="0dp"
-        android:layout_height="72dp"
+        android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:gravity="center_vertical"
+        android:text="오전 8:00"
         android:textColor="#222222"
-        android:textSize="24sp"
-        android:textStyle="bold"
-        android:paddingStart="16dp"
-        android:paddingEnd="12dp"
-        android:maxLines="2" />
+        android:textSize="22sp"
+        android:textStyle="bold" />
 
     <Button
-        android:id="@+id/btnDeleteItem"
-        android:layout_width="100dp"
+        android:id="@+id/btnDeleteTime"
+        android:layout_width="92dp"
         android:layout_height="56dp"
-        android:layout_marginEnd="8dp"
+        android:layout_marginStart="12dp"
         android:background="@drawable/delete_button_bg"
-        android:text="@string/delete"
+        android:text="삭제"
         android:textColor="#222222"
         android:textSize="20sp"
         android:textStyle="bold" />
-
 </LinearLayout>

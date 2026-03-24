@@ -1,5 +1,8 @@
 package com.sookmyung.list.ui;
 
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
+import android.view.Gravity;
 import android.app.Dialog;
 import android.os.Bundle;
 import android.os.Handler;
@@ -354,8 +357,11 @@ public class AddPillActivity extends AppCompatActivity {
         dialog.show();
 
         if (dialog.getWindow() != null) {
-            int width = (int) (getResources().getDisplayMetrics().widthPixels * 0.92f);
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+
+            int width = (int) (getResources().getDisplayMetrics().widthPixels * 0.90f);
             dialog.getWindow().setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT);
+            dialog.getWindow().setGravity(Gravity.CENTER);
         }
     }
 

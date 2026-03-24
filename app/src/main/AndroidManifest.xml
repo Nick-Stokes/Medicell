@@ -39,6 +39,7 @@
 
         <activity android:name="com.sookmyung.alarm.ui.AlarmListActivity" />
         <activity android:name="com.sookmyung.alarm.ui.AddAlarmActivity" />
+        <activity android:name="com.sookmyung.alarm.ui.TodayMedicineActivity" />
 
         <receiver
             android:name="com.sookmyung.alarm.AlarmReceiver"
