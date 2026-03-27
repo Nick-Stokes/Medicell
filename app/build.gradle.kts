@@ -1,14 +1,21 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
 }
 
+val localProps = Properties()
+val localPropsFile = rootProject.file("local.properties")
+if (localPropsFile.exists()) {
+    localProps.load(localPropsFile.inputStream())
+}
+val pillApiKey = localProps.getProperty("PILL_API_KEY") ?: ""
+
 android {
     namespace = "com.sookmyung.medicell"
-    compileSdk {
-        version = release(36)
-    }
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.sookmyung.medicell"
@@ -19,9 +26,12 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
+        buildConfigField("String", "PILL_API_KEY", "\"${pillApiKey}\"")
+
         ndk {
-            abiFilters += setOf("arm64-v8a")
+            abiFilters += setOf("arm64-v8a", "armeabi-v7a")
         }
+
         externalNativeBuild {
             cmake {
                 cppFlags += "-std=c++17"
@@ -61,17 +71,21 @@ android {
     }
 
     buildFeatures {
+        buildConfig = true
         compose = true
     }
 }
 
 dependencies {
     val camerax_version = "1.3.4"
+
     implementation("androidx.camera:camera-core:$camerax_version")
     implementation("androidx.camera:camera-camera2:$camerax_version")
     implementation("androidx.camera:camera-lifecycle:$camerax_version")
     implementation("androidx.camera:camera-view:$camerax_version")
-    implementation("org.tensorflow:tensorflow-lite:2.14.0")
+    implementation("org.tensorflow:tensorflow-lite:2.16.1")
+    implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
+    implementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.16.1")
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

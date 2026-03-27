@@ -36,125 +36,157 @@ public class PillResult extends AppCompatActivity {
 
     private static final String TAG = "PillResult";
 
-    // 식약처 알약식별 API
     private static final String PILL_INFO_BASE =
             "https://apis.data.go.kr/1471000/MdcinGrnIdntfcInfoService03/getMdcinGrnIdntfcInfoList03";
 
-    // 인증키
-    private static final String API_KEY =
-            "d3ba1256acc493aa40399b9f6c3e345f575156f91bb51050d066a63fdc29bc88";
+    private static final String API_KEY = "d3ba1256acc493aa40399b9f6c3e345f575156f91bb51050d066a63fdc29bc88";
 
     private ImageView pillPhotoView;
-    private TextView pillLabelView;
-    private TextView pillContentView;
-    private TextView pillTop5View;
+    private TextView  pillLabelView;
+    private TextView  pillContentView;
+    private TextView  pillTop5View;
 
-    private Bitmap photoBitmap;
+    private Bitmap         photoBitmap;
     private PillClassifier classifier;
-    private Handler mainHandler;
+    private Handler        mainHandler;
 
-    // TTS
     private TextToSpeech tts;
-    private String spokenName;
-    private String spokenDetail;
+    private String       spokenName;
+    private String       spokenDetail;
 
-    // 다음 페이지 전달용
     private String bestItemSeq;
     private String bestItemName;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_pill_result);
 
-        mainHandler = new Handler(Looper.getMainLooper());
-
+        mainHandler     = new Handler(Looper.getMainLooper());
         pillPhotoView   = findViewById(R.id.pillphoto);
         pillLabelView   = findViewById(R.id.pilllabel);
         pillContentView = findViewById(R.id.pill_content);
         pillTop5View    = findViewById(R.id.pill_top5);
 
-        // 사진 URI 받아서 표시
+        // ── 비트맵 로드 (메모리 우선, fallback URI) ───────
         String uriStr = getIntent().getStringExtra("photo_uri");
-        if (uriStr != null) {
+
+        photoBitmap = PillStorage.getPendingBitmap();
+        Log.d(TAG, "★ PillStorage 비트맵: " + (photoBitmap != null
+                ? photoBitmap.getWidth() + "x" + photoBitmap.getHeight()
+                : "NULL ← URI fallback 사용"));
+        if (photoBitmap != null) {
+            Log.d(TAG, "메모리 비트맵: "
+                    + photoBitmap.getWidth() + "x"
+                    + photoBitmap.getHeight()
+                    + "  config=" + photoBitmap.getConfig());
+            pillPhotoView.setImageBitmap(photoBitmap);
+        } else if (uriStr != null) {
             try {
                 Uri uri = Uri.parse(uriStr);
                 photoBitmap = loadBitmapFromUri(uri);
-                if (photoBitmap != null) {
+                Log.d(TAG, "URI 비트맵: "
+                        + (photoBitmap != null
+                        ? photoBitmap.getWidth() + "x"
+                        + photoBitmap.getHeight() : "null"));
+                if (photoBitmap != null)
                     pillPhotoView.setImageBitmap(photoBitmap);
-                }
             } catch (Exception e) {
-                Log.e(TAG, "사진 로드 실패", e);
-                Toast.makeText(this, "사진 로드 실패", Toast.LENGTH_SHORT).show();
+                Log.e(TAG, "사진 로드 실패: " + e.getMessage(), e);
+                Toast.makeText(this, "사진 로드 실패",
+                        Toast.LENGTH_SHORT).show();
             }
+        } else {
+            Log.e(TAG, "pendingBitmap 도 null, photo_uri 도 null");
         }
 
-        // 분류기 로드
-        try {
-            classifier = new PillClassifier(getApplicationContext());
-        } catch (Exception e) {
-            Log.e(TAG, "PillClassifier 로드 실패", e);
-            Toast.makeText(this, "모델 로드 실패", Toast.LENGTH_SHORT).show();
-            classifier = null;
-        }
-
-        // TTS 초기화
+        // ── TTS 초기화 ────────────────────────────────────
         tts = new TextToSpeech(getApplicationContext(), status -> {
             if (status == TextToSpeech.SUCCESS) {
                 int r = tts.setLanguage(Locale.KOREAN);
                 if (r == TextToSpeech.LANG_MISSING_DATA ||
-                        r == TextToSpeech.LANG_NOT_SUPPORTED) {
+                        r == TextToSpeech.LANG_NOT_SUPPORTED)
                     Log.e(TAG, "TTS: 한국어 미지원");
-                }
             } else {
-                Log.e(TAG, "TTS 초기화 실패");
+                Log.e(TAG, "TTS 초기화 실패 status=" + status);
             }
         });
 
+        // ── 음성 버튼 ─────────────────────────────────────
         View voiceBtn = findViewById(R.id.voice_pill);
-        if (voiceBtn != null) {
+        if (voiceBtn != null)
             voiceBtn.setOnClickListener(v -> speakPillInfo());
-        }
 
+        // ── 다음 버튼 ─────────────────────────────────────
         View nextBtn = findViewById(R.id.next_list);
         if (nextBtn != null) {
             nextBtn.setOnClickListener(v -> {
                 if (bestItemSeq == null || bestItemSeq.isEmpty()) {
-                    Toast.makeText(this, "1위 알약 정보가 없습니다.", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "1위 알약 정보가 없습니다.",
+                            Toast.LENGTH_SHORT).show();
                     return;
                 }
                 Intent it = new Intent(PillResult.this, TabooCheck.class);
-                it.putExtra("main_item_seq", bestItemSeq);
+                it.putExtra("main_item_seq",  bestItemSeq);
                 it.putExtra("main_item_name", bestItemName);
                 startActivity(it);
             });
         }
 
-        if (photoBitmap != null && classifier != null) {
-            runClassificationInBackground();
-        } else {
-            pillLabelView.setText("분류 불가");
-            pillContentView.setText("");
-            pillTop5View.setText("");
-        }
+        // ── 모델 로딩 → 백그라운드 ───────────────────────
+        pillLabelView.setText("모델 로딩 중...");
+        pillContentView.setText("");
+        pillTop5View.setText("");
+
+        new Thread(() -> {
+            try {
+                PillClassifier cls =
+                        new PillClassifier(getApplicationContext());
+                Log.d(TAG, "PillClassifier 로드 성공");
+
+                mainHandler.post(() -> {
+                    classifier = cls;
+                    if (photoBitmap != null) {
+                        pillLabelView.setText("분석 중...");
+                        runClassificationInBackground();
+                    } else {
+                        pillLabelView.setText("분류 불가");
+                    }
+                });
+
+            } catch (Exception e) {
+                Log.e(TAG, "PillClassifier 로드 실패: " + e.getMessage(), e);
+                mainHandler.post(() -> {
+                    pillLabelView.setText("모델 로드 실패");
+                    pillContentView.setText(e.getMessage());
+                    Toast.makeText(getApplicationContext(),
+                            "모델 로드 실패: " + e.getMessage(),
+                            Toast.LENGTH_LONG).show();
+                });
+            }
+        }).start();
     }
+
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
         if (classifier != null) classifier.close();
-        if (tts != null) {
-            tts.stop();
-            tts.shutdown();
-        }
+        if (tts != null) { tts.stop(); tts.shutdown(); }
     }
 
-    /** URI -> Bitmap */
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // URI → Bitmap (소프트웨어 렌더링 강제)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     private Bitmap loadBitmapFromUri(Uri uri) throws Exception {
         Bitmap bmp;
         if (Build.VERSION.SDK_INT >= 28) {
-            ImageDecoder.Source src = ImageDecoder.createSource(getContentResolver(), uri);
-            bmp = ImageDecoder.decodeBitmap(src);
+            ImageDecoder.Source src =
+                    ImageDecoder.createSource(getContentResolver(), uri);
+            bmp = ImageDecoder.decodeBitmap(src, (decoder, info, source) ->
+                    decoder.setAllocator(ImageDecoder.ALLOCATOR_SOFTWARE));
         } else {
             bmp = MediaStore.Images.Media.getBitmap(getContentResolver(), uri);
         }
@@ -162,173 +194,207 @@ public class PillResult extends AppCompatActivity {
         return bmp.copy(Bitmap.Config.ARGB_8888, false);
     }
 
-    /** AI 분류 + itemSeq -> API로 이름/설명 붙이기 */
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 백그라운드 추론
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     private void runClassificationInBackground() {
         new Thread(() -> {
             try {
-                PillClassifier.InferenceResult inference = classifier.clssify(photoBitmap);
+                Log.d(TAG, "classify() 호출  bitmap="
+                        + photoBitmap.getWidth() + "x"
+                        + photoBitmap.getHeight());
 
-                if (inference == null ||
-                        inference.top5Predictions == null ||
-                        inference.top5Predictions.isEmpty()) {
+                PillClassifier.InferenceResult inference =
+                        classifier.classify(photoBitmap);
+                Log.d(TAG, "classify() 완료");
 
+                if (inference == null
+                        || inference.top5Predictions == null
+                        || inference.top5Predictions.isEmpty()) {
+                    Log.e(TAG, "추론 결과 없음");
                     mainHandler.post(() -> {
                         pillLabelView.setText("예측 결과 없음");
                         pillContentView.setText("");
                         pillTop5View.setText("");
-                        spokenName = null;
-                        spokenDetail = null;
-                        bestItemSeq = null;
-                        bestItemName = null;
+                        spokenName = spokenDetail = null;
+                        bestItemSeq = bestItemName = null;
                     });
                     return;
                 }
 
-                List<PillClassifier.Prediction> preds = inference.top5Predictions;
+                List<PillClassifier.Prediction> preds =
+                        inference.top5Predictions;
+                PillClassifier.Stage1Result s1 = inference.stage1Result;
 
-                // 1위
-                PillClassifier.Prediction best = preds.get(0);
-                String bestSeqLocal = best.label;
+                Log.d(TAG, "Top1 item_seq=" + preds.get(0).label
+                        + "  score=" + preds.get(0).score);
 
-                PillInfo bestInfo = fetchPillInfo(bestSeqLocal);
+                // 1위 API 조회
+                PillClassifier.Prediction best     = preds.get(0);
+                String                    bestSeq  = best.label;
+                PillInfo                  bestInfo = fetchPillInfo(bestSeq);
 
-                String bestNameLocal;
-                if (bestInfo != null && bestInfo.itemName != null && !bestInfo.itemName.isEmpty()) {
+                String bestNameLocal = bestSeq;
+                if (bestInfo != null
+                        && bestInfo.itemName != null
+                        && !bestInfo.itemName.isEmpty())
                     bestNameLocal = bestInfo.itemName;
-                } else {
-                    bestNameLocal = bestSeqLocal;
-                }
 
-                String bestDetailLocal;
-                if (bestInfo != null) {
-                    StringBuilder sb = new StringBuilder();
-                    sb.append("분류: ")
-                            .append(bestInfo.className == null || bestInfo.className.isEmpty() ? "정보 없음" : bestInfo.className)
-                            .append("\n");
-                    sb.append("설명: ")
-                            .append(bestInfo.chart == null || bestInfo.chart.isEmpty() ? "정보 없음" : bestInfo.chart);
-                    bestDetailLocal = sb.toString();
-                } else {
-                    bestDetailLocal = "분류: 정보 없음\n설명: 정보 없음";
-                }
+                String bestDetailLocal = buildDetailText(bestInfo, best, s1);
 
-                // 2~5위 이름만
+                // Top5 텍스트
                 StringBuilder top5Builder = new StringBuilder();
-                for (int i = 1; i < preds.size() && i < 5; i++) {
-                    PillClassifier.Prediction p = preds.get(i);
+                for (int i = 0; i < preds.size(); i++) {
+                    PillClassifier.Prediction p    = preds.get(i);
+                    PillInfo                  info = fetchPillInfo(p.label);
 
-                    PillInfo info = fetchPillInfo(p.label);
-                    String displayName;
-                    if (info != null && info.itemName != null && !info.itemName.isEmpty()) {
+                    String displayName = p.label;
+                    if (info != null
+                            && info.itemName != null
+                            && !info.itemName.isEmpty())
                         displayName = info.itemName;
-                    } else {
-                        displayName = p.label;
-                    }
 
                     top5Builder.append(i + 1)
                             .append("위: ")
                             .append(displayName)
-                            .append("\n");
+                            .append("  (유사도 ")
+                            .append(String.format("%.1f%%", p.score * 100))
+                            .append(")\n");
                 }
+                String top5Text = top5Builder.toString().trim();
 
-                String top5TextLocal = top5Builder.toString();
+                String finalBestName   = bestNameLocal;
+                String finalBestDetail = bestDetailLocal;
+                String finalBestSeq    = bestSeq;
 
                 mainHandler.post(() -> {
-                    pillLabelView.setText(bestNameLocal);
-                    pillContentView.setText(bestDetailLocal);
-                    pillTop5View.setText(top5TextLocal);
-
-                    spokenName = bestNameLocal;
-                    spokenDetail = bestDetailLocal;
-
-                    bestItemSeq = bestSeqLocal;
-                    bestItemName = bestNameLocal;
+                    pillLabelView.setText(finalBestName);
+                    pillContentView.setText(finalBestDetail);
+                    pillTop5View.setText(top5Text);
+                    spokenName   = finalBestName;
+                    spokenDetail = finalBestDetail;
+                    bestItemSeq  = finalBestSeq;
+                    bestItemName = finalBestName;
                 });
 
             } catch (Exception e) {
-                Log.e(TAG, "분류 오류", e);
-
+                Log.e(TAG, "추론 오류: " + e.getMessage(), e);
                 mainHandler.post(() -> {
-                    pillLabelView.setText("오류");
-                    pillContentView.setText("");
+                    pillLabelView.setText("오류 발생");
+                    pillContentView.setText(e.getMessage());
                     pillTop5View.setText("");
-                    spokenName = null;
-                    spokenDetail = null;
-                    bestItemSeq = null;
-                    bestItemName = null;
+                    spokenName = spokenDetail = null;
+                    bestItemSeq = bestItemName = null;
                 });
             }
         }).start();
     }
 
-    /** itemSeq로 알약명/분류/설명 조회 */
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 상세 텍스트
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    private String buildDetailText(PillInfo info,
+                                   PillClassifier.Prediction best,
+                                   PillClassifier.Stage1Result s1) {
+        StringBuilder sb = new StringBuilder();
+
+        if (s1 != null) {
+            sb.append("모양: ")
+                    .append(PillClassifier.shapeName(s1.predShape))
+                    .append(String.format("  (%.1f%%)", s1.predProb * 100))
+                    .append("\n");
+        }
+
+        sb.append("유사도: ")
+                .append(String.format("%.1f%%", best.score * 100))
+                .append("\n");
+
+        sb.append("분류: ")
+                .append(info == null
+                        || info.className == null
+                        || info.className.isEmpty()
+                        ? "정보 없음" : info.className)
+                .append("\n");
+
+        sb.append("설명: ")
+                .append(info == null
+                        || info.chart == null
+                        || info.chart.isEmpty()
+                        ? "정보 없음" : info.chart);
+
+        return sb.toString();
+    }
+
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 식약처 API
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     private PillInfo fetchPillInfo(String itemSeq) {
         HttpURLConnection conn = null;
         try {
-            StringBuilder urlBuilder = new StringBuilder(PILL_INFO_BASE);
-            urlBuilder.append("?serviceKey=").append(API_KEY);
-            urlBuilder.append("&pageNo=1");
-            urlBuilder.append("&numOfRows=1");
-            urlBuilder.append("&type=xml");
-            urlBuilder.append("&item_seq=").append(URLEncoder.encode(itemSeq, "UTF-8"));
+            String urlStr = PILL_INFO_BASE
+                    + "?serviceKey=" + API_KEY
+                    + "&pageNo=1"
+                    + "&numOfRows=1"
+                    + "&type=xml"
+                    + "&item_seq=" + URLEncoder.encode(itemSeq, "UTF-8");
 
-            URL url = new URL(urlBuilder.toString());
-            conn = (HttpURLConnection) url.openConnection();
+            conn = (HttpURLConnection) new URL(urlStr).openConnection();
             conn.setConnectTimeout(5000);
             conn.setReadTimeout(5000);
             conn.setRequestMethod("GET");
 
-            int code = conn.getResponseCode();
-            if (code != HttpURLConnection.HTTP_OK) {
-                Log.d(TAG, "알약식별 HTTP 코드: " + code + " for itemSeq=" + itemSeq);
+            if (conn.getResponseCode() != HttpURLConnection.HTTP_OK) {
+                Log.d(TAG, "API HTTP 오류: " + conn.getResponseCode());
                 return null;
             }
 
-            InputStream is = conn.getInputStream();
-            DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
-            DocumentBuilder db = dbf.newDocumentBuilder();
-            Document doc = db.parse(is);
+            DocumentBuilder db =
+                    DocumentBuilderFactory.newInstance().newDocumentBuilder();
+            Document doc = db.parse(conn.getInputStream());
             doc.getDocumentElement().normalize();
 
             NodeList nodes = doc.getElementsByTagName("item");
-            if (nodes == null || nodes.getLength() == 0) {
-                Log.d(TAG, "알약식별 응답에 item 노드 없음 (itemSeq=" + itemSeq + ")");
-                return null;
-            }
+            if (nodes == null || nodes.getLength() == 0) return null;
 
-            Element item = (Element) nodes.item(0);
-
-            String itemName  = getTagText(item, "ITEM_NAME");
-            String className = getTagText(item, "CLASS_NAME");
-            String chart     = getTagText(item, "CHART");
-            if (chart == null || chart.isEmpty()) {
-                chart = getTagText(item, "DRUG_SHAPE");
-            }
-
+            Element  item = (Element) nodes.item(0);
             PillInfo info = new PillInfo();
             info.itemSeq   = itemSeq;
-            info.itemName  = itemName;
-            info.className = className;
-            info.chart     = chart;
+            info.itemName  = getTagText(item, "ITEM_NAME");
+            info.className = getTagText(item, "CLASS_NAME");
+            info.chart     = getTagText(item, "CHART");
+            if (info.chart == null || info.chart.isEmpty())
+                info.chart = getTagText(item, "DRUG_SHAPE");
+
             return info;
 
         } catch (Exception e) {
-            Log.e(TAG, "알약식별 API 조회 실패 (itemSeq=" + itemSeq + ")", e);
+            Log.e(TAG, "API 조회 실패  itemSeq=" + itemSeq
+                    + "  " + e.getMessage(), e);
             return null;
         } finally {
             if (conn != null) conn.disconnect();
         }
     }
 
-    /** XML에서 특정 태그 텍스트 얻기 */
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // XML 유틸
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     private String getTagText(Element parent, String tag) {
         NodeList list = parent.getElementsByTagName(tag);
         if (list == null || list.getLength() == 0) return null;
-        if (list.item(0).getFirstChild() == null) return null;
+        if (list.item(0) == null
+                || list.item(0).getFirstChild() == null) return null;
         return list.item(0).getFirstChild().getNodeValue();
     }
 
-    /** 알약 정보 모델 */
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 데이터 클래스
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     private static class PillInfo {
         String itemSeq;
         String itemName;
@@ -336,27 +402,25 @@ public class PillResult extends AppCompatActivity {
         String chart;
     }
 
-    /** TTS */
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // TTS
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     private void speakPillInfo() {
         if (tts == null) return;
 
         StringBuilder sb = new StringBuilder();
-
-        if (spokenName != null && !spokenName.isEmpty()) {
+        if (spokenName   != null && !spokenName.isEmpty())
             sb.append(spokenName).append(". ");
-        }
-
-        if (spokenDetail != null && !spokenDetail.isEmpty()) {
+        if (spokenDetail != null && !spokenDetail.isEmpty())
             sb.append(spokenDetail);
-        }
 
-        String text = sb.toString();
-
+        String text = sb.toString().trim();
         if (text.isEmpty()) {
-            Toast.makeText(this, "읽을 내용이 없습니다.", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "읽을 내용이 없습니다.",
+                    Toast.LENGTH_SHORT).show();
             return;
         }
-
         tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "pillResultTTS");
     }
 }

@@ -30,10 +30,10 @@ public class TabooCheck extends AppCompatActivity {
 
     private static final String TAG = "TabooCheck";
 
+
     private static final String DUR_BASE =
             "https://apis.data.go.kr/1471000/DURPrdlstInfoService03/getUsjntTabooInfoList03";
-    private static final String API_KEY =
-            "d3ba1256acc493aa40399b9f6c3e345f575156f91bb51050d066a63fdc29bc88";
+    private static final String API_KEY = "d3ba1256acc493aa40399b9f6c3e345f575156f91bb51050d066a63fdc29bc88";
 
     private LinearLayout container;   // 스크롤뷰 안의 LinearLayout
 

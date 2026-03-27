@@ -5,446 +5,304 @@ import android.content.res.AssetFileDescriptor;
 import android.graphics.Bitmap;
 import android.util.Log;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.tensorflow.lite.Interpreter;
 
-import java.io.BufferedReader;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.nio.MappedByteBuffer;
+import java.io.*;
+import java.nio.*;
 import java.nio.channels.FileChannel;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 
 public class PillClassifier {
 
-    private static final String TAG = "PillClassifier";
-    private static final int INPUT_SIZE = 224;
-    private static final int NUM_SHAPES = 4;
+    private static final String TAG        = "PillClassifier";
+    private static final int    INPUT_SIZE = 224;
+    private static final int    FEAT_DIM   = 576;
+    private static final int    TOP_K      = 5;
 
-    // TFLite files (crop_only best float32)
-    private static final String STAGE1_FILE = "stage1_crop_only_best_float32.tflite";
-    private static final String STAGE2_CIRCLE_FILE = "stage2_circle_crop_only_best_float32.tflite";
-    private static final String STAGE2_OVAL_FILE = "stage2_oval_crop_only_best_float32.tflite";
-    private static final String STAGE2_OBLONG_FILE = "stage2_oblong_crop_only_best_float32.tflite";
-    private static final String STAGE2_OTHER_FILE = "stage2_other_crop_only_best_float32.tflite";
+    private static final String STAGE1_FILE = "stage1.tflite";
 
-    // labelmap json (crop_only)
-    private static final String LABELMAP_CIRCLE_FILE = "stage2_circle_crop_only_labelmap.json";
-    private static final String LABELMAP_OVAL_FILE = "stage2_oval_crop_only_labelmap.json";
-    private static final String LABELMAP_OBLONG_FILE = "stage2_oblong_crop_only_labelmap.json";
-    private static final String LABELMAP_OTHER_FILE = "stage2_other_crop_only_labelmap.json";
+    private static final Map<Integer, String> STAGE2_FEAT_FILES =
+            new HashMap<Integer, String>() {{
+                put(0, "stage2_circle_feat.tflite");
+                put(1, "stage2_oval_feat.tflite");
+                put(2, "stage2_oblong_feat.tflite");
+                put(3, "stage2_other_feat.tflite");
+            }};
 
-    // rule
-    private static final float STAGE1_PROB_THRESHOLD = 0.7f;
-    private static final float STAGE1_GAP_THRESHOLD = 0.3f;
+    private static final Map<Integer, String> DB_FILES =
+            new HashMap<Integer, String>() {{
+                put(0, "circle_db.json");
+                put(1, "oval_db.json");
+                put(2, "oblong_db.json");
+                put(3, "other_db.json");
+            }};
 
-    private final Interpreter stage1Interpreter;
-    private final HashMap<Integer, Interpreter> stage2Interpreters = new HashMap<>();
-    private final HashMap<Integer, HashMap<Integer, String>> stage2LabelMaps = new HashMap<>();
+    private final Interpreter                     stage1Interpreter;
+    private final HashMap<Integer, Interpreter>   featInterpreters = new HashMap<>();
+    private final HashMap<Integer, List<DbEntry>> featureDbs       = new HashMap<>();
+
+
+    public PillClassifier(Context context) throws IOException {
+        Interpreter.Options options = new Interpreter.Options();
+        options.setNumThreads(4);
+
+        stage1Interpreter = new Interpreter(
+                loadModelFile(context, STAGE1_FILE), options);
+        Log.d(TAG, "Stage1 로드 완료");
+
+        for (int shape = 0; shape < 4; shape++) {
+            String featFile = STAGE2_FEAT_FILES.get(shape);
+            String dbFile   = DB_FILES.get(shape);
+
+            if (featFile != null) {
+                featInterpreters.put(shape,
+                        new Interpreter(
+                                loadModelFile(context, featFile), options));
+                Log.d(TAG, "Stage2 로드 완료: shape=" + shape);
+            }
+            if (dbFile != null)
+                featureDbs.put(shape, loadFeatureDb(context, dbFile));
+        }
+    }
+
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 메인 추론
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    public InferenceResult classify(Bitmap bitmap) {
+        if (bitmap == null)
+            return new InferenceResult(null, Collections.emptyList());
+
+        int w = bitmap.getWidth();
+        int h = bitmap.getHeight();
+        Log.d(TAG, "비트맵: " + w + "x" + h
+                + "  config=" + bitmap.getConfig());
+
+        Bitmap soft = bitmap.copy(Bitmap.Config.ARGB_8888, false);
+
+        // 중앙 픽셀 확인
+        int[] px = new int[1];
+        soft.getPixels(px, 0, w, w/2, h/2, 1, 1);
+        Log.d(TAG, "중앙 픽셀: R=" + ((px[0]>>16)&0xFF)
+                + " G=" + ((px[0]>>8)&0xFF)
+                + " B=" + (px[0]&0xFF));
+
+        Bitmap resized = Bitmap.createScaledBitmap(
+                soft, INPUT_SIZE, INPUT_SIZE, true);
+        resized = resized.copy(Bitmap.Config.ARGB_8888, false);
+
+        ByteBuffer input = bitmapToInput(resized);
+
+        // Stage1
+        float[][] out1     = new float[1][4];
+        stage1Interpreter.run(input, out1);
+        float[] shapeProbs = out1[0];
+        int     predShape  = argmax(shapeProbs);
+
+        Log.d(TAG, "Stage1: shape=" + shapeName(predShape)
+                + "  prob=" + shapeProbs[predShape]);
+        Log.d(TAG, "Stage1 전체: circle=" + shapeProbs[0]
+                + " oval=" + shapeProbs[1]
+                + " oblong=" + shapeProbs[2]
+                + " other=" + shapeProbs[3]);
+
+        Stage1Result s1 = new Stage1Result(
+                shapeProbs, predShape, shapeProbs[predShape]);
+
+        List<Prediction> top5 = runRetrieval(resized, predShape);
+
+        return new InferenceResult(s1, top5);
+    }
+
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // Retrieval
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    private List<Prediction> runRetrieval(Bitmap bmp, int shape) {
+        Interpreter   it = featInterpreters.get(shape);
+        List<DbEntry> db = featureDbs.get(shape);
+
+        if (it == null || db == null || db.isEmpty()) {
+            Log.w(TAG, "shape=" + shape + " 모델 또는 DB 없음");
+            return Collections.emptyList();
+        }
+
+        ByteBuffer input   = bitmapToInput(bmp);
+        float[][]  outFeat = new float[1][FEAT_DIM];
+        it.run(input, outFeat);
+        float[] feat = l2Normalize(outFeat[0]);
+
+        Log.d(TAG, "feat 첫 5개: "
+                + String.format("%.4f,%.4f,%.4f,%.4f,%.4f",
+                feat[0], feat[1], feat[2], feat[3], feat[4]));
+
+        List<Prediction> all = new ArrayList<>();
+        for (DbEntry entry : db) {
+            float sim = dotProduct(feat, entry.feature);
+            all.add(new Prediction(entry.itemSeq, sim, shapeName(shape)));
+        }
+
+        Collections.sort(all, (a, b) -> Float.compare(b.score, a.score));
+
+        List<Prediction> deduped = new ArrayList<>();
+        Set<String>      seen    = new LinkedHashSet<>();
+        for (Prediction p : all) {
+            if (!seen.contains(p.label)) {
+                seen.add(p.label);
+                deduped.add(p);
+                if (deduped.size() >= TOP_K) break;
+            }
+        }
+
+        Log.d(TAG, "Retrieval: shape=" + shape
+                + "  top1=" + (deduped.isEmpty() ? "없음"
+                : deduped.get(0).label)
+                + "  score=" + (deduped.isEmpty() ? 0
+                : deduped.get(0).score));
+
+        return deduped;
+    }
+
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 전처리 (raw 0-255 전달 → 모델 내부 Rescaling이 처리)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    private ByteBuffer bitmapToInput(Bitmap bitmap) {
+        ByteBuffer buf = ByteBuffer.allocateDirect(
+                4 * INPUT_SIZE * INPUT_SIZE * 3);
+        buf.order(ByteOrder.nativeOrder());
+
+        int[] pixels = new int[INPUT_SIZE * INPUT_SIZE];
+        bitmap.getPixels(pixels, 0, INPUT_SIZE, 0, 0, INPUT_SIZE, INPUT_SIZE);
+
+        for (int pixel : pixels) {
+            buf.putFloat((float)((pixel >> 16) & 0xFF));
+            buf.putFloat((float)((pixel >>  8) & 0xFF));
+            buf.putFloat((float)( pixel        & 0xFF));
+        }
+
+        buf.rewind();
+        return buf;
+    }
+
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 수학 유틸
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    private int argmax(float[] arr) {
+        int best = 0;
+        for (int i = 1; i < arr.length; i++)
+            if (arr[i] > arr[best]) best = i;
+        return best;
+    }
+
+    private float[] l2Normalize(float[] v) {
+        float norm = 0f;
+        for (float x : v) norm += x * x;
+        norm = (float) Math.sqrt(norm);
+        if (norm < 1e-12f) return v;
+        float[] out = new float[v.length];
+        for (int i = 0; i < v.length; i++) out[i] = v[i] / norm;
+        return out;
+    }
+
+    private float dotProduct(float[] a, float[] b) {
+        float sum = 0f;
+        int   len = Math.min(a.length, b.length);
+        for (int i = 0; i < len; i++) sum += a[i] * b[i];
+        return sum;
+    }
+
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 파일 로드
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    private MappedByteBuffer loadModelFile(Context context,
+                                           String name) throws IOException {
+        AssetFileDescriptor fd = context.getAssets().openFd(name);
+        FileInputStream     is = new FileInputStream(fd.getFileDescriptor());
+        FileChannel         fc = is.getChannel();
+        return fc.map(FileChannel.MapMode.READ_ONLY,
+                fd.getStartOffset(), fd.getDeclaredLength());
+    }
+
+    private List<DbEntry> loadFeatureDb(Context context, String file) {
+        List<DbEntry> db = new ArrayList<>();
+        try {
+            InputStream    is = context.getAssets().open(file);
+            BufferedReader br = new BufferedReader(
+                    new InputStreamReader(is));
+            StringBuilder  sb = new StringBuilder();
+            String line;
+            while ((line = br.readLine()) != null) sb.append(line);
+            br.close();
+
+            JSONArray arr = new JSONArray(sb.toString());
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject obj     = arr.getJSONObject(i);
+                String     itemSeq = obj.getString("item_seq");
+                JSONArray  featArr = obj.getJSONArray("feature");
+                float[]    feat    = new float[featArr.length()];
+                for (int j = 0; j < featArr.length(); j++)
+                    feat[j] = (float) featArr.getDouble(j);
+                db.add(new DbEntry(itemSeq, feat));
+            }
+            Log.d(TAG, file + " 로드: " + db.size() + "개 품목");
+
+        } catch (Exception e) {
+            Log.e(TAG, "DB 로드 실패: " + file + "  " + e.getMessage(), e);
+        }
+        return db;
+    }
+
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 데이터 클래스
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    public static class DbEntry {
+        public final String  itemSeq;
+        public final float[] feature;
+        public DbEntry(String itemSeq, float[] feature) {
+            this.itemSeq = itemSeq;
+            this.feature = feature;
+        }
+    }
 
     public static class Prediction {
-        public final int classIndex;   // local class index in stage2
-        public final String label;     // ITEM_SEQ
-        public final float score;      // probability
-        public final String source;    // circle / oval / oblong / other
-
-        public Prediction(int classIndex, String label, float score, String source) {
-            this.classIndex = classIndex;
-            this.label = label;
-            this.score = score;
+        public final String label;
+        public final float  score;
+        public final String source;
+        public Prediction(String label, float score, String source) {
+            this.label  = label;
+            this.score  = score;
             this.source = source;
         }
     }
 
     public static class Stage1Result {
-        public final float[] shapeProbs; // [circle, oval, oblong, other]
-        public final int top1Class;
-        public final int top2Class;
-        public final float top1Prob;
-        public final float top2Prob;
-        public final boolean runOtherAlso;
-
-        public Stage1Result(float[] shapeProbs, int top1Class, int top2Class,
-                            float top1Prob, float top2Prob, boolean runOtherAlso) {
-            this.shapeProbs = shapeProbs;
-            this.top1Class = top1Class;
-            this.top2Class = top2Class;
-            this.top1Prob = top1Prob;
-            this.top2Prob = top2Prob;
-            this.runOtherAlso = runOtherAlso;
+        public final float[] shapeProbs;
+        public final int     predShape;
+        public final float   predProb;
+        public Stage1Result(float[] probs, int shape, float prob) {
+            this.shapeProbs = probs;
+            this.predShape  = shape;
+            this.predProb   = prob;
         }
     }
 
     public static class InferenceResult {
-        public final Stage1Result stage1Result;
+        public final Stage1Result     stage1Result;
         public final List<Prediction> top5Predictions;
-
-        public InferenceResult(Stage1Result stage1Result, List<Prediction> top5Predictions) {
-            this.stage1Result = stage1Result;
-            this.top5Predictions = top5Predictions;
+        public InferenceResult(Stage1Result s1, List<Prediction> top5) {
+            this.stage1Result    = s1;
+            this.top5Predictions = top5;
         }
     }
 
-    public PillClassifier(Context context) throws IOException {
-        Log.d(TAG, "PillClassifier init start");
-
-        stage1Interpreter = new Interpreter(loadModelFile(context, STAGE1_FILE));
-        Log.d(TAG, "Loaded stage1: " + STAGE1_FILE);
-
-        stage2Interpreters.put(0, new Interpreter(loadModelFile(context, STAGE2_CIRCLE_FILE)));
-        stage2Interpreters.put(1, new Interpreter(loadModelFile(context, STAGE2_OVAL_FILE)));
-        stage2Interpreters.put(2, new Interpreter(loadModelFile(context, STAGE2_OBLONG_FILE)));
-        stage2Interpreters.put(3, new Interpreter(loadModelFile(context, STAGE2_OTHER_FILE)));
-
-        stage2LabelMaps.put(0, loadLabelMap(context, LABELMAP_CIRCLE_FILE));
-        stage2LabelMaps.put(1, loadLabelMap(context, LABELMAP_OVAL_FILE));
-        stage2LabelMaps.put(2, loadLabelMap(context, LABELMAP_OBLONG_FILE));
-        stage2LabelMaps.put(3, loadLabelMap(context, LABELMAP_OTHER_FILE));
-
-        Log.d(TAG, "All stage2 models + labelmaps loaded");
-
-        // output size debug
-        logInterpreterShapes();
-    }
-
-    private void logInterpreterShapes() {
-        try {
-            int[] s1In = stage1Interpreter.getInputTensor(0).shape();
-            int[] s1Out = stage1Interpreter.getOutputTensor(0).shape();
-            Log.d(TAG, "stage1 input shape=" + shapeToString(s1In) + ", output shape=" + shapeToString(s1Out));
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to log stage1 tensor shapes", e);
-        }
-
-        for (int sc = 0; sc <= 3; sc++) {
-            try {
-                Interpreter it = stage2Interpreters.get(sc);
-                HashMap<Integer, String> map = stage2LabelMaps.get(sc);
-                if (it == null) continue;
-                int[] in = it.getInputTensor(0).shape();
-                int[] out = it.getOutputTensor(0).shape();
-                int outClasses = (out.length >= 2) ? out[out.length - 1] : -1;
-                int mapSize = (map == null) ? -1 : map.size();
-
-                Log.d(TAG,
-                        "stage2 " + shapeName(sc) +
-                                " input shape=" + shapeToString(in) +
-                                ", output shape=" + shapeToString(out) +
-                                ", outputClasses=" + outClasses +
-                                ", labelMapSize=" + mapSize);
-            } catch (Exception e) {
-                Log.e(TAG, "Failed to log stage2 tensor shape for " + shapeName(sc), e);
-            }
-        }
-    }
-
-    private String shapeToString(int[] shape) {
-        if (shape == null) return "null";
-        StringBuilder sb = new StringBuilder("[");
-        for (int i = 0; i < shape.length; i++) {
-            if (i > 0) sb.append(", ");
-            sb.append(shape[i]);
-        }
-        sb.append("]");
-        return sb.toString();
-    }
-
-    private MappedByteBuffer loadModelFile(Context context, String modelFile) throws IOException {
-        AssetFileDescriptor fileDescriptor = context.getAssets().openFd(modelFile);
-        FileInputStream inputStream = new FileInputStream(fileDescriptor.getFileDescriptor());
-        FileChannel fileChannel = inputStream.getChannel();
-        long startOffset = fileDescriptor.getStartOffset();
-        long declaredLength = fileDescriptor.getDeclaredLength();
-        return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength);
-    }
-
-    private HashMap<Integer, String> loadLabelMap(Context context, String jsonFile) throws IOException {
-        InputStream is = context.getAssets().open(jsonFile);
-        BufferedReader br = new BufferedReader(new InputStreamReader(is));
-        StringBuilder sb = new StringBuilder();
-        String line;
-
-        while ((line = br.readLine()) != null) {
-            sb.append(line);
-        }
-        br.close();
-
-        HashMap<Integer, String> map = new HashMap<>();
-        try {
-            JSONObject root = new JSONObject(sb.toString());
-            JSONObject lut = root.getJSONObject("local_to_item_seq");
-
-            java.util.Iterator<String> keys = lut.keys();
-            while (keys.hasNext()) {
-                String key = keys.next();
-                map.put(Integer.parseInt(key), lut.getString(key));
-            }
-
-            Log.d(TAG, "Loaded " + jsonFile + " labelmap size=" + map.size());
-        } catch (Exception e) {
-            Log.e(TAG, "JSON parse failed: " + jsonFile, e);
-        }
-
-        return map;
-    }
-
-    // main inference
-    public InferenceResult classify(Bitmap bitmap) {
-        if (bitmap == null) {
-            Log.e(TAG, "classify: bitmap is null");
-            return new InferenceResult(
-                    new Stage1Result(new float[]{0f, 0f, 0f, 0f}, -1, -1, 0f, 0f, false),
-                    Collections.emptyList()
-            );
-        }
-
-        bitmap = bitmap.copy(Bitmap.Config.ARGB_8888, false);
-        if (bitmap == null) {
-            Log.e(TAG, "classify: bitmap.copy failed");
-            return new InferenceResult(
-                    new Stage1Result(new float[]{0f, 0f, 0f, 0f}, -1, -1, 0f, 0f, false),
-                    Collections.emptyList()
-            );
-        }
-
-        Bitmap resized = Bitmap.createScaledBitmap(bitmap, INPUT_SIZE, INPUT_SIZE, true);
-        resized = resized.copy(Bitmap.Config.ARGB_8888, false);
-        if (resized == null) {
-            Log.e(TAG, "classify: resized.copy failed");
-            return new InferenceResult(
-                    new Stage1Result(new float[]{0f, 0f, 0f, 0f}, -1, -1, 0f, 0f, false),
-                    Collections.emptyList()
-            );
-        }
-
-        // Stage1
-        ByteBuffer stage1Input = bitmapToMobileNetV3Input(resized);
-        float[][] stage1Output = new float[1][NUM_SHAPES];
-        stage1Interpreter.run(stage1Input, stage1Output);
-
-        float[] shapeProbs = ensureProbabilities(stage1Output[0]);
-        int[] top2 = getTopKIndices(shapeProbs, 2);
-
-        int top1Class = top2.length > 0 ? top2[0] : -1;
-        int top2Class = top2.length > 1 ? top2[1] : -1;
-        float top1Prob = top1Class >= 0 ? shapeProbs[top1Class] : 0f;
-        float secondProb = top2Class >= 0 ? shapeProbs[top2Class] : 0f;
-
-        boolean runOtherAlso =
-                (top1Prob <= STAGE1_PROB_THRESHOLD) ||
-                        ((top1Prob - secondProb) <= STAGE1_GAP_THRESHOLD);
-
-        Log.d(TAG,
-                "Stage1 probs => circle=" + shapeProbs[0] +
-                        ", oval=" + shapeProbs[1] +
-                        ", oblong=" + shapeProbs[2] +
-                        ", other=" + shapeProbs[3]);
-
-        Log.d(TAG,
-                "Stage1 route => top1=" + shapeName(top1Class) + "(" + top1Class + ")" +
-                        ", top2=" + shapeName(top2Class) + "(" + top2Class + ")" +
-                        ", top1Prob=" + top1Prob +
-                        ", top2Prob=" + secondProb +
-                        ", gap=" + (top1Prob - secondProb) +
-                        ", runOtherAlso=" + runOtherAlso);
-
-        Stage1Result stage1Result = new Stage1Result(
-                shapeProbs, top1Class, top2Class, top1Prob, secondProb, runOtherAlso
-        );
-
-        // Stage2 merge
-        List<Prediction> mergedTop5 = runMergedStage2(resized, stage1Result);
-
-        for (int i = 0; i < mergedTop5.size(); i++) {
-            Prediction p = mergedTop5.get(i);
-            Log.d(TAG, "Final Top" + (i + 1) + " => itemSeq=" + p.label + ", prob=" + p.score + ", source=" + p.source + ", localIdx=" + p.classIndex);
-        }
-
-        return new InferenceResult(stage1Result, mergedTop5);
-    }
-
-    // typo compatibility
-    public InferenceResult clssify(Bitmap bitmap) {
-        return classify(bitmap);
-    }
-
-    private ByteBuffer bitmapToMobileNetV3Input(Bitmap bitmap) {
-        // IMPORTANT:
-        // mobilenet_v3.preprocess_input is pass-through by default,
-        // and MobileNetV3 expects float pixels in [0,255] if preprocessing is included in model.
-        int[] pixels = new int[INPUT_SIZE * INPUT_SIZE];
-        bitmap.getPixels(pixels, 0, INPUT_SIZE, 0, 0, INPUT_SIZE, INPUT_SIZE);
-
-        ByteBuffer inputBuffer = ByteBuffer.allocateDirect(4 * INPUT_SIZE * INPUT_SIZE * 3);
-        inputBuffer.order(ByteOrder.nativeOrder());
-
-        int idx = 0;
-        for (int y = 0; y < INPUT_SIZE; y++) {
-            for (int x = 0; x < INPUT_SIZE; x++) {
-                int pixel = pixels[idx++];
-
-                int r = (pixel >> 16) & 0xFF;
-                int g = (pixel >> 8) & 0xFF;
-                int b = pixel & 0xFF;
-
-                // pass 0..255 float
-                inputBuffer.putFloat((float) r);
-                inputBuffer.putFloat((float) g);
-                inputBuffer.putFloat((float) b);
-            }
-        }
-
-        inputBuffer.rewind();
-        return inputBuffer;
-    }
-
-    private List<Prediction> runMergedStage2(Bitmap resizedBitmap, Stage1Result stage1Result) {
-        List<Prediction> candidates = new ArrayList<>();
-
-        if (stage1Result.top1Class >= 0) {
-            candidates.addAll(runSingleStage2(resizedBitmap, stage1Result.top1Class));
-        }
-
-        int OTHER_CLASS = 3;
-        if (stage1Result.runOtherAlso && stage1Result.top1Class != OTHER_CLASS) {
-            candidates.addAll(runSingleStage2(resizedBitmap, OTHER_CLASS));
-        }
-
-        HashMap<String, Prediction> bestByItemSeq = new HashMap<>();
-        for (Prediction p : candidates) {
-            Prediction prev = bestByItemSeq.get(p.label);
-            if (prev == null || p.score > prev.score) {
-                bestByItemSeq.put(p.label, p);
-            }
-        }
-
-        List<Prediction> merged = new ArrayList<>(bestByItemSeq.values());
-        Collections.sort(merged, (a, b) -> Float.compare(b.score, a.score));
-
-        if (merged.size() > 5) {
-            return new ArrayList<>(merged.subList(0, 5));
-        }
-        return merged;
-    }
-
-    private List<Prediction> runSingleStage2(Bitmap bitmap, int shapeClass) {
-        Interpreter interpreter = stage2Interpreters.get(shapeClass);
-        HashMap<Integer, String> labelMap = stage2LabelMaps.get(shapeClass);
-
-        if (interpreter == null || labelMap == null) {
-            Log.e(TAG, "runSingleStage2: missing interpreter or labelmap for shapeClass=" + shapeClass);
-            return Collections.emptyList();
-        }
-
-        int outputClasses;
-        try {
-            int[] outShape = interpreter.getOutputTensor(0).shape();
-            outputClasses = outShape[outShape.length - 1];
-        } catch (Exception e) {
-            Log.e(TAG, "runSingleStage2: failed to get output tensor shape for " + shapeName(shapeClass), e);
-            outputClasses = labelMap.size();
-        }
-
-        if (outputClasses <= 0) {
-            Log.e(TAG, "runSingleStage2: invalid output size for shapeClass=" + shapeClass);
-            return Collections.emptyList();
-        }
-
-        if (labelMap.size() != outputClasses) {
-            Log.w(TAG, "LabelMap size != model output classes for " + shapeName(shapeClass)
-                    + " | labelMap=" + labelMap.size() + ", output=" + outputClasses);
-        }
-
-        ByteBuffer inputBuffer = bitmapToMobileNetV3Input(bitmap);
-        float[][] output = new float[1][outputClasses];
-        interpreter.run(inputBuffer, output);
-
-        float[] probs = ensureProbabilities(output[0]);
-        List<Integer> topIdx = getTopKIndicesList(probs, 5);
-
-        List<Prediction> result = new ArrayList<>();
-        for (int idx : topIdx) {
-            String itemSeq = labelMap.get(idx);
-            if (itemSeq == null) {
-                itemSeq = "local_" + idx;
-                Log.w(TAG, "Missing labelMap entry: shape=" + shapeName(shapeClass) + ", localIdx=" + idx);
-            }
-            result.add(new Prediction(idx, itemSeq, probs[idx], shapeName(shapeClass)));
-        }
-
-        Log.d(TAG, "Stage2 " + shapeName(shapeClass) + " top results:");
-        for (Prediction p : result) {
-            Log.d(TAG, "  localIdx=" + p.classIndex + ", itemSeq=" + p.label + ", prob=" + p.score);
-        }
-
-        return result;
-    }
-
-    private float[] ensureProbabilities(float[] scores) {
-        if (scores == null || scores.length == 0) return new float[0];
-
-        boolean allNonNegative = true;
-        float sum = 0f;
-        for (float v : scores) {
-            if (v < 0f) allNonNegative = false;
-            sum += v;
-        }
-
-        if (allNonNegative && sum > 0.9f && sum < 1.1f) {
-            return scores;
-        }
-
-        float max = -Float.MAX_VALUE;
-        for (float v : scores) {
-            if (v > max) max = v;
-        }
-
-        float expSum = 0f;
-        float[] exps = new float[scores.length];
-        for (int i = 0; i < scores.length; i++) {
-            exps[i] = (float) Math.exp(scores[i] - max);
-            expSum += exps[i];
-        }
-
-        float[] probs = new float[scores.length];
-        if (expSum == 0f) return probs;
-
-        for (int i = 0; i < scores.length; i++) {
-            probs[i] = exps[i] / expSum;
-        }
-        return probs;
-    }
-
-    private int[] getTopKIndices(float[] scores, int k) {
-        List<Integer> list = getTopKIndicesList(scores, k);
-        int[] arr = new int[list.size()];
-        for (int i = 0; i < list.size(); i++) arr[i] = list.get(i);
-        return arr;
-    }
-
-    private List<Integer> getTopKIndicesList(float[] scores, int k) {
-        List<Integer> indices = new ArrayList<>();
-        for (int i = 0; i < scores.length; i++) {
-            indices.add(i);
-        }
-
-        Collections.sort(indices, (a, b) -> Float.compare(scores[b], scores[a]));
-
-        if (indices.size() > k) {
-            return new ArrayList<>(indices.subList(0, k));
-        }
-        return indices;
-    }
-
-    public static String shapeName(int shapeClass) {
-        switch (shapeClass) {
+    public static String shapeName(int s) {
+        switch (s) {
             case 0: return "circle";
             case 1: return "oval";
             case 2: return "oblong";
@@ -454,10 +312,7 @@ public class PillClassifier {
     }
 
     public void close() {
-        try { stage1Interpreter.close(); } catch (Exception ignored) {}
-
-        for (Interpreter it : stage2Interpreters.values()) {
-            try { it.close(); } catch (Exception ignored) {}
-        }
+        stage1Interpreter.close();
+        for (Interpreter it : featInterpreters.values()) it.close();
     }
 }
