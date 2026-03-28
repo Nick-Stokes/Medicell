@@ -1,5 +1,7 @@
 package com.sookmyung.alarm.ui;
 
+import android.graphics.Paint;
+import java.lang.reflect.Field;
 import android.widget.ImageButton;
 import android.util.Log;
 import android.view.Window;
@@ -601,6 +603,32 @@ public class AddAlarmActivity extends AppCompatActivity {
 
     private void setNumberPickerTextSize(NumberPicker picker, float textSizeSp) {
         try {
+            int textSizePx = (int) TypedValue.applyDimension(
+                    TypedValue.COMPLEX_UNIT_SP,
+                    textSizeSp,
+                    getResources().getDisplayMetrics()
+            );
+
+            Field selectorWheelPaintField = NumberPicker.class.getDeclaredField("mSelectorWheelPaint");
+            selectorWheelPaintField.setAccessible(true);
+            Paint selectorWheelPaint = (Paint) selectorWheelPaintField.get(picker);
+            if (selectorWheelPaint != null) {
+                selectorWheelPaint.setTextSize(textSizePx);
+                selectorWheelPaint.setTypeface(Typeface.DEFAULT_BOLD);
+                selectorWheelPaint.setColor(Color.parseColor("#222222"));
+            }
+
+            Field inputTextField = NumberPicker.class.getDeclaredField("mInputText");
+            inputTextField.setAccessible(true);
+            EditText inputText = (EditText) inputTextField.get(picker);
+            if (inputText != null) {
+                inputText.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSizeSp);
+                inputText.setTypeface(Typeface.DEFAULT_BOLD);
+                inputText.setTextColor(Color.parseColor("#222222"));
+                inputText.setGravity(Gravity.CENTER);
+                inputText.setIncludeFontPadding(false);
+            }
+
             for (int i = 0; i < picker.getChildCount(); i++) {
                 View child = picker.getChildAt(i);
                 if (child instanceof EditText) {
@@ -621,8 +649,20 @@ public class AddAlarmActivity extends AppCompatActivity {
     }
 
     private void hideNumberPickerDivider(NumberPicker picker) {
-        picker.invalidate();
-        picker.requestLayout();
+        try {
+            Field selectionDividerField = NumberPicker.class.getDeclaredField("mSelectionDivider");
+            selectionDividerField.setAccessible(true);
+            selectionDividerField.set(picker, new ColorDrawable(Color.TRANSPARENT));
+
+            Field selectionDividerHeightField = NumberPicker.class.getDeclaredField("mSelectionDividerHeight");
+            selectionDividerHeightField.setAccessible(true);
+            selectionDividerHeightField.setInt(picker, 0);
+
+            picker.invalidate();
+            picker.requestLayout();
+        } catch (Exception e) {
+            Log.e("AddAlarmActivity", "hideNumberPickerDivider error", e);
+        }
     }
 
     private void openWheelTimeDialog(TimeCardAdapter.TimeItem editItem) {
