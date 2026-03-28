@@ -2,7 +2,6 @@ package com.sookmyung.alarm.ui;
 
 import com.sookmyung.medicell.threeButton;
 import android.widget.LinearLayout;
-import android.widget.ImageButton;
 import android.app.Dialog;
 import android.content.Intent;
 import android.os.Bundle;

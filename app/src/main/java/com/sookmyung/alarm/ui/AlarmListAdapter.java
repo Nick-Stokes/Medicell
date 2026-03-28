@@ -75,7 +75,16 @@ public class AlarmListAdapter extends RecyclerView.Adapter<AlarmListAdapter.VH> 
 
     private String buildTimeText(List<Alarm> alarms) {
         List<Alarm> sorted = new ArrayList<>(alarms);
-        Collections.sort(sorted, Comparator.comparingInt((Alarm a) -> a.hour).thenComparingInt(a -> a.minute));
+        Collections.sort(sorted, new Comparator<Alarm>() {
+            @Override
+            public int compare(Alarm a1, Alarm a2) {
+                if (a1.hour != a2.hour) {
+                    return Integer.compare(a1.hour, a2.hour);
+                }
+                return Integer.compare(a1.minute, a2.minute);
+            }
+        });
+
         List<String> parts = new ArrayList<>();
         for (Alarm alarm : sorted) {
             parts.add(formatTime(alarm.hour, alarm.minute));
