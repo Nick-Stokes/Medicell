@@ -108,7 +108,7 @@ public class AlarmListActivity extends AppCompatActivity {
         TextView btnNo = dialog.findViewById(R.id.btnNo);
         TextView btnYes = dialog.findViewById(R.id.btnYes);
 
-        tvMessage.setText("이 복용 알림을 삭제하시겠습니까?");
+        tvMessage.setText("알림을\n삭제하시겠습니까?");
         btnNo.setText("취소");
         btnYes.setText("삭제");
         btnNo.setOnClickListener(v -> dialog.dismiss());

@@ -108,10 +108,21 @@ public class TodayMedicineActivity extends AppCompatActivity {
             tvEmptyTodayMedicine.setVisibility(View.GONE);
         }
 
-        Collections.sort(todayAlarms, Comparator
-                .comparingInt((Alarm a) -> a.hour)
-                .thenComparingInt(a -> a.minute)
-                .thenComparing(a -> a.pillName));
+        Collections.sort(todayAlarms, new Comparator<Alarm>() {
+            @Override
+            public int compare(Alarm a1, Alarm a2) {
+                if (a1.hour != a2.hour) {
+                    return Integer.compare(a1.hour, a2.hour);
+                }
+                if (a1.minute != a2.minute) {
+                    return Integer.compare(a1.minute, a2.minute);
+                }
+
+                String name1 = a1.pillName == null ? "" : a1.pillName;
+                String name2 = a2.pillName == null ? "" : a2.pillName;
+                return name1.compareTo(name2);
+            }
+        });
 
         Map<String, List<Alarm>> groupedMap = new LinkedHashMap<>();
         for (Alarm alarm : todayAlarms) {

@@ -323,7 +323,7 @@ public class AddPillActivity extends AppCompatActivity {
         Button btnYes = dialog.findViewById(R.id.btnYes);
 
         String pillName = item.itemName == null ? "" : item.itemName.trim();
-        tvMessage.setText(pillName + "\n을(를) 추가하시겠습니까?");
+        tvMessage.setText(pillName + "\n추가하시겠습니까?");
 
         btnNo.setText("아니오");
         btnYes.setText("예");
