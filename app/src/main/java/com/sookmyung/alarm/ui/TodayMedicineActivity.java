@@ -56,6 +56,13 @@ public class TodayMedicineActivity extends AppCompatActivity {
         layoutTodayMedicineContainer = findViewById(R.id.layoutTodayMedicineContainer);
         btnAddAlarm = findViewById(R.id.btnAddAlarm);
 
+        findViewById(R.id.btnBackCircle).setOnClickListener(v -> {
+            Intent intent = new Intent(this, AlarmListActivity.class);
+            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            startActivity(intent);
+            finish();
+        });
+
         btnAddAlarm.setOnClickListener(v ->
                 startActivity(new Intent(this, AddAlarmActivity.class)));
 
@@ -181,9 +188,9 @@ public class TodayMedicineActivity extends AppCompatActivity {
         TextView tvPill = new TextView(this);
         tvPill.setText(pillName);
         tvPill.setTextColor(Color.parseColor("#222222"));
-        tvPill.setTextSize(TypedValue.COMPLEX_UNIT_SP, 22);
+        tvPill.setTextSize(TypedValue.COMPLEX_UNIT_SP, 24);
         tvPill.setTypeface(Typeface.DEFAULT_BOLD);
-        tvPill.setPadding(dp(20), dp(16), dp(20), dp(16));
+        tvPill.setPadding(dp(20), dp(20), dp(20), dp(20));
 
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(Color.WHITE);

@@ -1,5 +1,6 @@
 package com.sookmyung.list.ui;
 
+import com.sookmyung.medicell.threeButton;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.view.Gravity;
@@ -42,6 +43,9 @@ public class PillListActivity extends AppCompatActivity {
     private static final String KEY =
             "05e7eb40989bb1a835e6fbcc11e6143335a7e69dcacb6929762947845547d798";
 
+    private static final int DETAIL_TAB_SELECTED_COLOR = Color.parseColor("#F28C28");
+    private static final int DETAIL_TAB_DEFAULT_COLOR = Color.parseColor("#222222");
+
     private PillAdapter adapter;
     private DrugDetailService detailService;
     private TextView tvEmpty;
@@ -64,6 +68,13 @@ public class PillListActivity extends AppCompatActivity {
         );
 
         rv.setAdapter(adapter);
+
+        findViewById(R.id.btnBackCircle).setOnClickListener(v -> {
+            Intent intent = new Intent(this, threeButton.class);
+            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            startActivity(intent);
+            finish();
+        });
 
         Button btnAdd = findViewById(R.id.btnAdd);
         btnAdd.setOnClickListener(v ->
@@ -131,6 +142,18 @@ public class PillListActivity extends AppCompatActivity {
         ImageView ivPill = dialog.findViewById(R.id.ivPill);
         TextView tvTitle = dialog.findViewById(R.id.tvPillTitle);
 
+        LinearLayout layoutTabSection = dialog.findViewById(R.id.layoutTabSection);
+        LinearLayout tabBasic = dialog.findViewById(R.id.tabBasic);
+        LinearLayout tabCaution = dialog.findViewById(R.id.tabCaution);
+
+        TextView tvTabBasic = dialog.findViewById(R.id.tvTabBasic);
+        TextView tvTabCaution = dialog.findViewById(R.id.tvTabCaution);
+        View viewTabBasicUnderline = dialog.findViewById(R.id.viewTabBasicUnderline);
+        View viewTabCautionUnderline = dialog.findViewById(R.id.viewTabCautionUnderline);
+
+        LinearLayout layoutBasicContent = dialog.findViewById(R.id.layoutBasicContent);
+        LinearLayout layoutCautionContent = dialog.findViewById(R.id.layoutCautionContent);
+
         LinearLayout layoutEfficacy = dialog.findViewById(R.id.layoutEfficacy);
         LinearLayout layoutUsage = dialog.findViewById(R.id.layoutUsage);
         LinearLayout layoutCaution = dialog.findViewById(R.id.layoutCaution);
@@ -138,56 +161,104 @@ public class PillListActivity extends AppCompatActivity {
         TextView tvEfficacy = dialog.findViewById(R.id.tvEfficacy);
         TextView tvUsage = dialog.findViewById(R.id.tvUsage);
         TextView tvCaution = dialog.findViewById(R.id.tvCaution);
+        View viewNoDetailDivider = dialog.findViewById(R.id.viewNoDetailDivider);
         TextView tvNoDetail = dialog.findViewById(R.id.tvNoDetail);
         TextView btnClose = dialog.findViewById(R.id.btnClose);
 
         tvTitle.setText(pill.itemName);
         loadPillImage(ivPill, pill);
 
+        tabBasic.setOnClickListener(v -> switchDetailTab(
+                true,
+                layoutBasicContent,
+                layoutCautionContent,
+                tvTabBasic,
+                tvTabCaution,
+                viewTabBasicUnderline,
+                viewTabCautionUnderline
+        ));
+
+        tabCaution.setOnClickListener(v -> switchDetailTab(
+                false,
+                layoutBasicContent,
+                layoutCautionContent,
+                tvTabBasic,
+                tvTabCaution,
+                viewTabBasicUnderline,
+                viewTabCautionUnderline
+        ));
+
         btnClose.setOnClickListener(v -> dialog.dismiss());
 
         dialog.show();
 
         if (dialog.getWindow() != null) {
-            int width = (int) (getResources().getDisplayMetrics().widthPixels * 0.95f);
-            int height = (int) (getResources().getDisplayMetrics().heightPixels * 0.88f);
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+
+            int width = (int) (getResources().getDisplayMetrics().widthPixels * 0.92f);
+            int height = (int) (getResources().getDisplayMetrics().heightPixels * 0.86f);
             dialog.getWindow().setLayout(width, height);
+            dialog.getWindow().setGravity(Gravity.CENTER);
         }
 
         applyDetailToViews(
                 pill.efficacy,
                 pill.usage,
                 pill.caution,
+                layoutTabSection,
+                layoutBasicContent,
+                layoutCautionContent,
                 layoutEfficacy,
                 layoutUsage,
                 layoutCaution,
                 tvEfficacy,
                 tvUsage,
                 tvCaution,
-                tvNoDetail
+                viewNoDetailDivider,
+                tvNoDetail,
+                tvTabBasic,
+                tvTabCaution,
+                viewTabBasicUnderline,
+                viewTabCautionUnderline
         );
 
         loadDrugDetail(
                 pill,
+                layoutTabSection,
+                layoutBasicContent,
+                layoutCautionContent,
                 layoutEfficacy,
                 layoutUsage,
                 layoutCaution,
                 tvEfficacy,
                 tvUsage,
                 tvCaution,
-                tvNoDetail
+                viewNoDetailDivider,
+                tvNoDetail,
+                tvTabBasic,
+                tvTabCaution,
+                viewTabBasicUnderline,
+                viewTabCautionUnderline
         );
     }
 
     private void loadDrugDetail(
             Pill pill,
+            LinearLayout layoutTabSection,
+            LinearLayout layoutBasicContent,
+            LinearLayout layoutCautionContent,
             LinearLayout layoutEfficacy,
             LinearLayout layoutUsage,
             LinearLayout layoutCaution,
             TextView tvEfficacy,
             TextView tvUsage,
             TextView tvCaution,
-            TextView tvNoDetail
+            View viewNoDetailDivider,
+            TextView tvNoDetail,
+            TextView tvTabBasic,
+            TextView tvTabCaution,
+            View viewTabBasicUnderline,
+            View viewTabCautionUnderline
     ) {
         detailService.getDetail(KEY, 1, 10, "json", pill.itemSeq)
                 .enqueue(new Callback<DrugDetailEnvelope>() {
@@ -209,13 +280,21 @@ public class PillListActivity extends AppCompatActivity {
                                     "",
                                     "",
                                     "",
+                                    layoutTabSection,
+                                    layoutBasicContent,
+                                    layoutCautionContent,
                                     layoutEfficacy,
                                     layoutUsage,
                                     layoutCaution,
                                     tvEfficacy,
                                     tvUsage,
                                     tvCaution,
-                                    tvNoDetail
+                                    viewNoDetailDivider,
+                                    tvNoDetail,
+                                    tvTabBasic,
+                                    tvTabCaution,
+                                    viewTabBasicUnderline,
+                                    viewTabCautionUnderline
                             );
                             return;
                         }
@@ -238,13 +317,21 @@ public class PillListActivity extends AppCompatActivity {
                                 pill.efficacy,
                                 pill.usage,
                                 pill.caution,
+                                layoutTabSection,
+                                layoutBasicContent,
+                                layoutCautionContent,
                                 layoutEfficacy,
                                 layoutUsage,
                                 layoutCaution,
                                 tvEfficacy,
                                 tvUsage,
                                 tvCaution,
-                                tvNoDetail
+                                viewNoDetailDivider,
+                                tvNoDetail,
+                                tvTabBasic,
+                                tvTabCaution,
+                                viewTabBasicUnderline,
+                                viewTabCautionUnderline
                         );
                     }
 
@@ -259,13 +346,21 @@ public class PillListActivity extends AppCompatActivity {
                                 "",
                                 "",
                                 "",
+                                layoutTabSection,
+                                layoutBasicContent,
+                                layoutCautionContent,
                                 layoutEfficacy,
                                 layoutUsage,
                                 layoutCaution,
                                 tvEfficacy,
                                 tvUsage,
                                 tvCaution,
-                                tvNoDetail
+                                viewNoDetailDivider,
+                                tvNoDetail,
+                                tvTabBasic,
+                                tvTabCaution,
+                                viewTabBasicUnderline,
+                                viewTabCautionUnderline
                         );
 
                         Toast.makeText(
@@ -281,13 +376,21 @@ public class PillListActivity extends AppCompatActivity {
             String efficacy,
             String usage,
             String caution,
+            LinearLayout layoutTabSection,
+            LinearLayout layoutBasicContent,
+            LinearLayout layoutCautionContent,
             LinearLayout layoutEfficacy,
             LinearLayout layoutUsage,
             LinearLayout layoutCaution,
             TextView tvEfficacy,
             TextView tvUsage,
             TextView tvCaution,
-            TextView tvNoDetail
+            View viewNoDetailDivider,
+            TextView tvNoDetail,
+            TextView tvTabBasic,
+            TextView tvTabCaution,
+            View viewTabBasicUnderline,
+            View viewTabCautionUnderline
     ) {
         boolean noEfficacy = isEmpty(efficacy);
         boolean noUsage = isEmpty(usage);
@@ -296,8 +399,13 @@ public class PillListActivity extends AppCompatActivity {
         boolean allEmpty = noEfficacy && noUsage && noCaution;
 
         if (allEmpty) {
+            viewNoDetailDivider.setVisibility(View.VISIBLE);
             tvNoDetail.setVisibility(View.VISIBLE);
             tvNoDetail.setText(getString(R.string.no_detail_message));
+
+            layoutTabSection.setVisibility(View.GONE);
+            layoutBasicContent.setVisibility(View.GONE);
+            layoutCautionContent.setVisibility(View.GONE);
 
             layoutEfficacy.setVisibility(View.GONE);
             layoutUsage.setVisibility(View.GONE);
@@ -305,7 +413,12 @@ public class PillListActivity extends AppCompatActivity {
             return;
         }
 
+        viewNoDetailDivider.setVisibility(View.GONE);
         tvNoDetail.setVisibility(View.GONE);
+
+        layoutTabSection.setVisibility(View.VISIBLE);
+        layoutBasicContent.setVisibility(View.VISIBLE);
+        layoutCautionContent.setVisibility(View.GONE);
 
         layoutEfficacy.setVisibility(View.VISIBLE);
         layoutUsage.setVisibility(View.VISIBLE);
@@ -314,6 +427,35 @@ public class PillListActivity extends AppCompatActivity {
         tvEfficacy.setText(noEfficacy ? getString(R.string.info_not_found) : efficacy);
         tvUsage.setText(noUsage ? getString(R.string.info_not_found) : usage);
         tvCaution.setText(noCaution ? getString(R.string.info_not_found) : caution);
+
+        switchDetailTab(
+                true,
+                layoutBasicContent,
+                layoutCautionContent,
+                tvTabBasic,
+                tvTabCaution,
+                viewTabBasicUnderline,
+                viewTabCautionUnderline
+        );
+    }
+
+    private void switchDetailTab(
+            boolean showBasic,
+            LinearLayout layoutBasicContent,
+            LinearLayout layoutCautionContent,
+            TextView tvTabBasic,
+            TextView tvTabCaution,
+            View viewTabBasicUnderline,
+            View viewTabCautionUnderline
+    ) {
+        layoutBasicContent.setVisibility(showBasic ? View.VISIBLE : View.GONE);
+        layoutCautionContent.setVisibility(showBasic ? View.GONE : View.VISIBLE);
+
+        tvTabBasic.setTextColor(showBasic ? DETAIL_TAB_SELECTED_COLOR : DETAIL_TAB_DEFAULT_COLOR);
+        tvTabCaution.setTextColor(showBasic ? DETAIL_TAB_DEFAULT_COLOR : DETAIL_TAB_SELECTED_COLOR);
+
+        viewTabBasicUnderline.setVisibility(showBasic ? View.VISIBLE : View.INVISIBLE);
+        viewTabCautionUnderline.setVisibility(showBasic ? View.INVISIBLE : View.VISIBLE);
     }
 
     private void loadPillImage(ImageView imageView, Pill pill) {

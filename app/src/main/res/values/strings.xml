@@ -38,7 +38,7 @@
     <string name="pill_detail_title">약 정보</string>
     <string name="pill_detail_no_info">이 약은 현재 상세 복약 정보가 제공되지 않습니다. 약국 안내 또는 제품 설명서를 함께 확인해주세요.</string>
     <string name="pill_image_desc">알약 이미지</string>
-    <string name="no_detail_message">이 약은 현재 상세 복약 정보가 제공되지 않습니다. 약국 안내 또는 제품 설명서를 함께 확인해주세요.</string>
+    <string name="no_detail_message">"이 약은 현재 상세 복약 정보가\n제공되지 않습니다.\n약국 안내 또는 제품 설명서를\n함께 확인해주세요."</string>
     <string name="section_efficacy">효능</string>
     <string name="section_usage">복용방법</string>
     <string name="section_caution">주의사항</string>

@@ -1,5 +1,6 @@
 package com.sookmyung.alarm.ui;
 
+import android.widget.ImageButton;
 import android.util.Log;
 import android.view.Window;
 import android.Manifest;
@@ -58,7 +59,7 @@ public class AddAlarmActivity extends AppCompatActivity {
 
     private static final int REQ_POST_NOTIFICATIONS = 1001;
 
-    private TextView tvBack;
+    private ImageButton btnBackCircle;
     private View step1Container;
     private View step2Container;
 
@@ -109,7 +110,7 @@ public class AddAlarmActivity extends AppCompatActivity {
     }
 
     private void bindViews() {
-        tvBack = findViewById(R.id.tvBack);
+        btnBackCircle = findViewById(R.id.btnBackCircle);
         step1Container = findViewById(R.id.step1Container);
         step2Container = findViewById(R.id.step2Container);
         btnBottom = findViewById(R.id.btnBottom);
@@ -131,7 +132,7 @@ public class AddAlarmActivity extends AppCompatActivity {
         rvTimes = findViewById(R.id.rvTimes);
         tvTimeGuide = findViewById(R.id.tvTimeGuide);
 
-        tvBack.setOnClickListener(v -> handleBackClick());
+        btnBackCircle.setOnClickListener(v -> handleBackClick());
         findViewById(R.id.btnAddTime).setOnClickListener(v -> openWheelTimeDialog(null));
         btnBottom.setOnClickListener(v -> onBottomButtonClicked());
     }
@@ -721,6 +722,10 @@ public class AddAlarmActivity extends AppCompatActivity {
             applyPickerAppearance(pickerMinute);
         });
 
+        pickerAmPm.post(() -> {
+            adjustPickerOverlay(dialog);
+            drawPickerLines(dialog);
+        });
 
         btnClose.setOnClickListener(v -> dialog.dismiss());
 
@@ -870,5 +875,45 @@ public class AddAlarmActivity extends AppCompatActivity {
 
     private int dpToPx(int dp) {
         return Math.round(getResources().getDisplayMetrics().density * dp);
+    }
+
+    private void drawPickerLines(Dialog dialog) {
+        View frame = dialog.findViewById(R.id.timePickerFrame);
+        if (frame == null) return;
+
+        View topLine = dialog.findViewById(R.id.topDividerLine);
+        View bottomLine = dialog.findViewById(R.id.bottomDividerLine);
+
+        if (topLine == null || bottomLine == null) return;
+
+        int frameHeight = frame.getHeight();
+        if (frameHeight <= 0) return;
+
+        int centerY = frameHeight / 2;
+        int gapHalf = dpToPx(37);  // 선택 영역 절반 높이
+        int lineHeight = dpToPx(2);
+
+        topLine.setY(centerY - gapHalf - (lineHeight / 2f));
+        bottomLine.setY(centerY + gapHalf - (lineHeight / 2f));
+    }
+
+    private void adjustPickerOverlay(Dialog dialog) {
+        View frame = dialog.findViewById(R.id.timePickerFrame);
+        if (frame == null) return;
+
+        View topMask = dialog.findViewById(R.id.topDividerMask);
+        View bottomMask = dialog.findViewById(R.id.bottomDividerMask);
+
+        if (topMask == null || bottomMask == null) return;
+
+        int frameHeight = frame.getHeight();
+        if (frameHeight <= 0) return;
+
+        int centerY = frameHeight / 2;
+        int gapHalf = dpToPx(37);   // 선택 영역 높이 절반
+        int maskHeight = dpToPx(12); // 기존 검정선 가릴 흰색 띠 높이
+
+        topMask.setY(centerY - gapHalf - (maskHeight / 2f));
+        bottomMask.setY(centerY + gapHalf - (maskHeight / 2f));
     }
 }

@@ -9,7 +9,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginStart="12dp"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="38dp"
         android:layout_marginEnd="12dp">
 
         <TextView
@@ -24,13 +24,25 @@
             android:textColor="#222222"
             android:textSize="26sp"
             android:textStyle="bold" />
+
+        <ImageButton
+            android:id="@+id/btnBackCircle"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
+            android:layout_gravity="start|center_vertical"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/bg_circle_back_button"
+            android:contentDescription="뒤로가기"
+            android:padding="14dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_chevron_left" />
     </FrameLayout>
 
     <TextView
         android:id="@+id/tvTodayDate"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="16dp"
+        android:layout_marginStart="20dp"
         android:layout_marginTop="16dp"
         android:layout_marginEnd="16dp"
         android:text="2026년 3월 24일 화요일"
@@ -78,7 +90,7 @@
         android:layout_height="64dp"
         android:layout_marginStart="12dp"
         android:layout_marginEnd="12dp"
-        android:layout_marginBottom="10dp"
+        android:layout_marginBottom="38dp"
         android:background="@drawable/bg_primary_button"
         android:text="알림 추가"
         android:textAllCaps="false"

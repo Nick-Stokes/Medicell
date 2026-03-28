@@ -30,6 +30,7 @@
         android:clipChildren="false"
         android:clipToPadding="false">
 
+        <!-- 기존 NumberPicker 3개 -->
         <LinearLayout
             android:id="@+id/timePickerRow"
             android:layout_width="match_parent"
@@ -48,6 +49,7 @@
                 android:layout_width="0dp"
                 android:layout_height="200dp"
                 android:layout_weight="1.1"
+                android:background="@android:color/transparent"
                 android:descendantFocusability="blocksDescendants"
                 android:fadingEdgeLength="0dp" />
 
@@ -56,6 +58,7 @@
                 android:layout_width="0dp"
                 android:layout_height="200dp"
                 android:layout_weight="1.0"
+                android:background="@android:color/transparent"
                 android:descendantFocusability="blocksDescendants"
                 android:fadingEdgeLength="0dp" />
 
@@ -64,9 +67,39 @@
                 android:layout_width="0dp"
                 android:layout_height="200dp"
                 android:layout_weight="1.1"
+                android:background="@android:color/transparent"
                 android:descendantFocusability="blocksDescendants"
                 android:fadingEdgeLength="0dp" />
         </LinearLayout>
+
+        <View
+            android:id="@+id/topDividerMask"
+            android:layout_width="match_parent"
+            android:layout_height="12dp"
+            android:layout_gravity="top"
+            android:background="#FFFFFF" />
+
+        <View
+            android:id="@+id/bottomDividerMask"
+            android:layout_width="match_parent"
+            android:layout_height="12dp"
+            android:layout_gravity="top"
+            android:background="#FFFFFF" />
+
+        <View
+            android:id="@+id/topDividerLine"
+            android:layout_width="match_parent"
+            android:layout_height="2dp"
+            android:layout_gravity="top"
+            android:background="#4A4A4A" />
+
+        <View
+            android:id="@+id/bottomDividerLine"
+            android:layout_width="match_parent"
+            android:layout_height="2dp"
+            android:layout_gravity="top"
+            android:background="#4A4A4A" />
+
     </FrameLayout>
 
     <!-- 버튼을 더 아래로 -->

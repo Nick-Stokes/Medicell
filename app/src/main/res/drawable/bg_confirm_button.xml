@@ -6,6 +6,6 @@
     <solid android:color="#D8C2A8" />
 
     <!-- 둥근 모서리 -->
-    <corners android:radius="16dp" />
+    <corners android:radius="28dp" />
 
 </shape>

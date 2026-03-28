@@ -1,5 +1,6 @@
 package com.sookmyung.alarm.ui;
 
+import com.sookmyung.medicell.threeButton;
 import android.widget.LinearLayout;
 import android.widget.ImageButton;
 import android.app.Dialog;
@@ -55,6 +56,13 @@ public class AlarmListActivity extends AppCompatActivity {
             }
         });
         recycler.setAdapter(adapter);
+
+        findViewById(R.id.btnBackCircle).setOnClickListener(v -> {
+            Intent intent = new Intent(this, threeButton.class);
+            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            startActivity(intent);
+            finish();
+        });
 
         Button btnAdd = findViewById(R.id.btnAdd);
         btnAdd.setOnClickListener(v -> startActivity(new Intent(this, AddAlarmActivity.class)));
