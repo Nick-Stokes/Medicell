@@ -1,5 +1,6 @@
 package com.sookmyung.list.ui;
 
+import android.widget.FrameLayout;
 import android.widget.ProgressBar;
 import com.sookmyung.list.detail.PermitInfoApiClient;
 import com.sookmyung.list.detail.PermitInfoEnvelope;
@@ -168,7 +169,7 @@ public class PillListActivity extends AppCompatActivity {
         TextView tvUsage = dialog.findViewById(R.id.tvUsage);
         TextView tvCaution = dialog.findViewById(R.id.tvCaution);
         View viewNoDetailDivider = dialog.findViewById(R.id.viewNoDetailDivider);
-        LinearLayout layoutNoDetailState = dialog.findViewById(R.id.layoutNoDetailState);
+        FrameLayout layoutNoDetailState = dialog.findViewById(R.id.layoutNoDetailState);
         ProgressBar progressDetailLoading = dialog.findViewById(R.id.progressDetailLoading);
         TextView tvNoDetail = dialog.findViewById(R.id.tvNoDetail);
         TextView btnClose = dialog.findViewById(R.id.btnClose);
@@ -286,7 +287,7 @@ public class PillListActivity extends AppCompatActivity {
             TextView tvUsage,
             TextView tvCaution,
             View viewNoDetailDivider,
-            LinearLayout layoutNoDetailState,
+            FrameLayout layoutNoDetailState,
             ProgressBar progressDetailLoading,
             TextView tvNoDetail,
             TextView tvTabBasic,
@@ -442,7 +443,7 @@ public class PillListActivity extends AppCompatActivity {
             TextView tvUsage,
             TextView tvCaution,
             View viewNoDetailDivider,
-            LinearLayout layoutNoDetailState,
+            FrameLayout layoutNoDetailState,
             ProgressBar progressDetailLoading,
             TextView tvNoDetail,
             TextView tvTabBasic,
@@ -549,7 +550,7 @@ public class PillListActivity extends AppCompatActivity {
             TextView tvUsage,
             TextView tvCaution,
             View viewNoDetailDivider,
-            LinearLayout layoutNoDetailState,
+            FrameLayout layoutNoDetailState,
             ProgressBar progressDetailLoading,
             TextView tvNoDetail,
             TextView tvTabBasic,
@@ -772,7 +773,7 @@ public class PillListActivity extends AppCompatActivity {
             TextView tvUsage,
             TextView tvCaution,
             View viewNoDetailDivider,
-            LinearLayout layoutNoDetailState,
+            FrameLayout layoutNoDetailState,
             ProgressBar progressDetailLoading,
             TextView tvNoDetail,
             TextView tvTabBasic,
@@ -830,7 +831,7 @@ public class PillListActivity extends AppCompatActivity {
             LinearLayout layoutUsage,
             LinearLayout layoutCaution,
             View viewNoDetailDivider,
-            LinearLayout layoutNoDetailState,
+            FrameLayout layoutNoDetailState,
             ProgressBar progressDetailLoading,
             TextView tvNoDetail
     ) {
@@ -863,7 +864,7 @@ public class PillListActivity extends AppCompatActivity {
             TextView tvUsage,
             TextView tvCaution,
             View viewNoDetailDivider,
-            LinearLayout layoutNoDetailState,
+            FrameLayout layoutNoDetailState,
             ProgressBar progressDetailLoading,
             TextView tvNoDetail,
             TextView tvTabBasic,

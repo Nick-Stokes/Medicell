@@ -54,28 +54,18 @@
                 android:background="#CFC9C1"
                 android:visibility="gone" />
 
-            <LinearLayout
+            <FrameLayout
                 android:id="@+id/layoutNoDetailState"
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
                 android:layout_weight="1"
-                android:gravity="center"
-                android:orientation="vertical"
                 android:visibility="gone">
-
-                <ProgressBar
-                    android:id="@+id/progressDetailLoading"
-                    style="?android:attr/progressBarStyleLarge"
-                    android:indeterminateTint="#BFB8AE"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="26dp"
-                    android:visibility="gone" />
 
                 <TextView
                     android:id="@+id/tvNoDetail"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layout_gravity="center"
                     android:gravity="center"
                     android:lineSpacingExtra="10dp"
                     android:paddingStart="28dp"
@@ -84,7 +74,18 @@
                     android:textColor="#333333"
                     android:textSize="23sp"
                     android:visibility="gone" />
-            </LinearLayout>
+
+                <ProgressBar
+                    android:id="@+id/progressDetailLoading"
+                    style="?android:attr/progressBarStyleLarge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:translationY="-100dp"
+                    android:indeterminateTint="#BFB8AE"
+                    android:visibility="gone" />
+
+            </FrameLayout>
 
             <LinearLayout
                 android:id="@+id/layoutTabSection"
