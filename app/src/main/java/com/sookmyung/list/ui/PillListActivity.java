@@ -1,5 +1,8 @@
 package com.sookmyung.list.ui;
 
+import com.sookmyung.list.detail.PermitInfoApiClient;
+import com.sookmyung.list.detail.PermitInfoEnvelope;
+import com.sookmyung.list.detail.PermitInfoService;
 import com.sookmyung.medicell.threeButton;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
@@ -48,6 +51,7 @@ public class PillListActivity extends AppCompatActivity {
 
     private PillAdapter adapter;
     private DrugDetailService detailService;
+    private PermitInfoService permitInfoService;
     private TextView tvEmpty;
 
     @Override
@@ -56,6 +60,7 @@ public class PillListActivity extends AppCompatActivity {
         setContentView(R.layout.activity_pill_list);
 
         detailService = DrugDetailApiClient.get();
+        permitInfoService = PermitInfoApiClient.get();
 
         RecyclerView rv = findViewById(R.id.recycler);
         tvEmpty = findViewById(R.id.tvEmpty);
@@ -276,10 +281,8 @@ public class PillListActivity extends AppCompatActivity {
                                 || response.body().body.items == null
                                 || response.body().body.items.isEmpty()) {
 
-                            applyDetailToViews(
-                                    "",
-                                    "",
-                                    "",
+                            loadPermitDetailFallback(
+                                    pill,
                                     layoutTabSection,
                                     layoutBasicContent,
                                     layoutCautionContent,
@@ -301,15 +304,41 @@ public class PillListActivity extends AppCompatActivity {
 
                         DrugDetailEnvelope.Item item = response.body().body.items.get(0);
 
-                        pill.efficacy = cleanHtml(item.efcyQesitm);
-                        pill.usage = cleanHtml(item.useMethodQesitm);
-                        pill.caution = mergeNonEmpty(
+                        String efficacy = cleanHtml(item.efcyQesitm);
+                        String usage = cleanHtml(item.useMethodQesitm);
+                        String caution = mergeNonEmpty(
                                 cleanHtml(item.atpnWarnQesitm),
                                 cleanHtml(item.atpnQesitm),
                                 cleanHtml(item.intrcQesitm),
                                 cleanHtml(item.seQesitm),
                                 cleanHtml(item.depositMethodQesitm)
                         );
+
+                        if (isEmpty(efficacy) && isEmpty(usage) && isEmpty(caution)) {
+                            loadPermitDetailFallback(
+                                    pill,
+                                    layoutTabSection,
+                                    layoutBasicContent,
+                                    layoutCautionContent,
+                                    layoutEfficacy,
+                                    layoutUsage,
+                                    layoutCaution,
+                                    tvEfficacy,
+                                    tvUsage,
+                                    tvCaution,
+                                    viewNoDetailDivider,
+                                    tvNoDetail,
+                                    tvTabBasic,
+                                    tvTabCaution,
+                                    viewTabBasicUnderline,
+                                    viewTabCautionUnderline
+                            );
+                            return;
+                        }
+
+                        pill.efficacy = efficacy;
+                        pill.usage = usage;
+                        pill.caution = caution;
 
                         PillStorage.upsert(PillListActivity.this, pill);
 
@@ -342,6 +371,250 @@ public class PillListActivity extends AppCompatActivity {
 
                         Log.e("API_TEST", "API 실패: " + t.getMessage());
 
+                        loadPermitDetailFallback(
+                                pill,
+                                layoutTabSection,
+                                layoutBasicContent,
+                                layoutCautionContent,
+                                layoutEfficacy,
+                                layoutUsage,
+                                layoutCaution,
+                                tvEfficacy,
+                                tvUsage,
+                                tvCaution,
+                                viewNoDetailDivider,
+                                tvNoDetail,
+                                tvTabBasic,
+                                tvTabCaution,
+                                viewTabBasicUnderline,
+                                viewTabCautionUnderline
+                        );
+                    }
+                });
+    }
+
+    private void loadPermitDetailFallback(
+            Pill pill,
+            LinearLayout layoutTabSection,
+            LinearLayout layoutBasicContent,
+            LinearLayout layoutCautionContent,
+            LinearLayout layoutEfficacy,
+            LinearLayout layoutUsage,
+            LinearLayout layoutCaution,
+            TextView tvEfficacy,
+            TextView tvUsage,
+            TextView tvCaution,
+            View viewNoDetailDivider,
+            TextView tvNoDetail,
+            TextView tvTabBasic,
+            TextView tvTabCaution,
+            View viewTabBasicUnderline,
+            View viewTabCautionUnderline
+    ) {
+        permitInfoService.getDetailByItemSeq(
+                KEY, 1, 10, "json", pill.itemSeq, null
+        ).enqueue(new Callback<PermitInfoEnvelope>() {
+            @Override
+            public void onResponse(
+                    @NonNull Call<PermitInfoEnvelope> call,
+                    @NonNull Response<PermitInfoEnvelope> response
+            ) {
+                PermitInfoEnvelope.Item permitItem =
+                        response.body() == null ? null : response.body().getFirstItem();
+
+                if (permitItem != null) {
+                    applyPermitFallbackResult(
+                            pill,
+                            permitItem,
+                            layoutTabSection,
+                            layoutBasicContent,
+                            layoutCautionContent,
+                            layoutEfficacy,
+                            layoutUsage,
+                            layoutCaution,
+                            tvEfficacy,
+                            tvUsage,
+                            tvCaution,
+                            viewNoDetailDivider,
+                            tvNoDetail,
+                            tvTabBasic,
+                            tvTabCaution,
+                            viewTabBasicUnderline,
+                            viewTabCautionUnderline
+                    );
+                    return;
+                }
+
+                loadPermitDetailFallbackByName(
+                        pill,
+                        layoutTabSection,
+                        layoutBasicContent,
+                        layoutCautionContent,
+                        layoutEfficacy,
+                        layoutUsage,
+                        layoutCaution,
+                        tvEfficacy,
+                        tvUsage,
+                        tvCaution,
+                        viewNoDetailDivider,
+                        tvNoDetail,
+                        tvTabBasic,
+                        tvTabCaution,
+                        viewTabBasicUnderline,
+                        viewTabCautionUnderline
+                );
+            }
+
+            @Override
+            public void onFailure(
+                    @NonNull Call<PermitInfoEnvelope> call,
+                    @NonNull Throwable t
+            ) {
+                loadPermitDetailFallbackByName(
+                        pill,
+                        layoutTabSection,
+                        layoutBasicContent,
+                        layoutCautionContent,
+                        layoutEfficacy,
+                        layoutUsage,
+                        layoutCaution,
+                        tvEfficacy,
+                        tvUsage,
+                        tvCaution,
+                        viewNoDetailDivider,
+                        tvNoDetail,
+                        tvTabBasic,
+                        tvTabCaution,
+                        viewTabBasicUnderline,
+                        viewTabCautionUnderline
+                );
+            }
+        });
+    }
+
+    private void loadPermitDetailFallbackByName(
+            Pill pill,
+            LinearLayout layoutTabSection,
+            LinearLayout layoutBasicContent,
+            LinearLayout layoutCautionContent,
+            LinearLayout layoutEfficacy,
+            LinearLayout layoutUsage,
+            LinearLayout layoutCaution,
+            TextView tvEfficacy,
+            TextView tvUsage,
+            TextView tvCaution,
+            View viewNoDetailDivider,
+            TextView tvNoDetail,
+            TextView tvTabBasic,
+            TextView tvTabCaution,
+            View viewTabBasicUnderline,
+            View viewTabCautionUnderline
+    ) {
+        permitInfoService.findItemSeqByNameAndCompany(
+                KEY,
+                1,
+                1,
+                "json",
+                pill.itemName,
+                pill.entpName
+        ).enqueue(new Callback<PermitInfoEnvelope>() {
+            @Override
+            public void onResponse(
+                    @NonNull Call<PermitInfoEnvelope> call,
+                    @NonNull Response<PermitInfoEnvelope> response
+            ) {
+                PermitInfoEnvelope.Item matchedItem =
+                        response.body() == null ? null : response.body().getFirstItem();
+
+                if (matchedItem == null) {
+                    applyDetailToViews(
+                            "",
+                            "",
+                            "",
+                            layoutTabSection,
+                            layoutBasicContent,
+                            layoutCautionContent,
+                            layoutEfficacy,
+                            layoutUsage,
+                            layoutCaution,
+                            tvEfficacy,
+                            tvUsage,
+                            tvCaution,
+                            viewNoDetailDivider,
+                            tvNoDetail,
+                            tvTabBasic,
+                            tvTabCaution,
+                            viewTabBasicUnderline,
+                            viewTabCautionUnderline
+                    );
+                    return;
+                }
+
+                String matchedItemSeq = matchedItem.itemSeq;
+
+                if (isEmpty(matchedItemSeq)) {
+                    applyDetailToViews(
+                            "",
+                            "",
+                            "",
+                            layoutTabSection,
+                            layoutBasicContent,
+                            layoutCautionContent,
+                            layoutEfficacy,
+                            layoutUsage,
+                            layoutCaution,
+                            tvEfficacy,
+                            tvUsage,
+                            tvCaution,
+                            viewNoDetailDivider,
+                            tvNoDetail,
+                            tvTabBasic,
+                            tvTabCaution,
+                            viewTabBasicUnderline,
+                            viewTabCautionUnderline
+                    );
+                    return;
+                }
+
+                permitInfoService.getDetailByItemSeq(
+                        KEY,
+                        1,
+                        10,
+                        "json",
+                        matchedItemSeq,
+                        null
+                ).enqueue(new Callback<PermitInfoEnvelope>() {
+                    @Override
+                    public void onResponse(
+                            @NonNull Call<PermitInfoEnvelope> call,
+                            @NonNull Response<PermitInfoEnvelope> detailResponse
+                    ) {
+                        PermitInfoEnvelope.Item detailItem =
+                                detailResponse.body() == null ? null : detailResponse.body().getFirstItem();
+
+                        if (detailItem != null) {
+                            applyPermitFallbackResult(
+                                    pill,
+                                    detailItem,
+                                    layoutTabSection,
+                                    layoutBasicContent,
+                                    layoutCautionContent,
+                                    layoutEfficacy,
+                                    layoutUsage,
+                                    layoutCaution,
+                                    tvEfficacy,
+                                    tvUsage,
+                                    tvCaution,
+                                    viewNoDetailDivider,
+                                    tvNoDetail,
+                                    tvTabBasic,
+                                    tvTabCaution,
+                                    viewTabBasicUnderline,
+                                    viewTabCautionUnderline
+                            );
+                            return;
+                        }
+
                         applyDetailToViews(
                                 "",
                                 "",
@@ -362,14 +635,128 @@ public class PillListActivity extends AppCompatActivity {
                                 viewTabBasicUnderline,
                                 viewTabCautionUnderline
                         );
+                    }
 
-                        Toast.makeText(
-                                PillListActivity.this,
-                                R.string.detail_load_failed,
-                                Toast.LENGTH_SHORT
-                        ).show();
+                    @Override
+                    public void onFailure(
+                            @NonNull Call<PermitInfoEnvelope> call,
+                            @NonNull Throwable t
+                    ) {
+                        applyDetailToViews(
+                                "",
+                                "",
+                                "",
+                                layoutTabSection,
+                                layoutBasicContent,
+                                layoutCautionContent,
+                                layoutEfficacy,
+                                layoutUsage,
+                                layoutCaution,
+                                tvEfficacy,
+                                tvUsage,
+                                tvCaution,
+                                viewNoDetailDivider,
+                                tvNoDetail,
+                                tvTabBasic,
+                                tvTabCaution,
+                                viewTabBasicUnderline,
+                                viewTabCautionUnderline
+                        );
                     }
                 });
+            }
+
+            @Override
+            public void onFailure(
+                    @NonNull Call<PermitInfoEnvelope> call,
+                    @NonNull Throwable t
+            ) {
+                applyDetailToViews(
+                        "",
+                        "",
+                        "",
+                        layoutTabSection,
+                        layoutBasicContent,
+                        layoutCautionContent,
+                        layoutEfficacy,
+                        layoutUsage,
+                        layoutCaution,
+                        tvEfficacy,
+                        tvUsage,
+                        tvCaution,
+                        viewNoDetailDivider,
+                        tvNoDetail,
+                        tvTabBasic,
+                        tvTabCaution,
+                        viewTabBasicUnderline,
+                        viewTabCautionUnderline
+                );
+            }
+        });
+    }
+
+    private boolean hasPermitItem(Response<PermitInfoEnvelope> response) {
+        return response.body() != null
+                && response.body().getFirstItem() != null;
+    }
+
+    private void applyPermitFallbackResult(
+            Pill pill,
+            PermitInfoEnvelope.Item item,
+            LinearLayout layoutTabSection,
+            LinearLayout layoutBasicContent,
+            LinearLayout layoutCautionContent,
+            LinearLayout layoutEfficacy,
+            LinearLayout layoutUsage,
+            LinearLayout layoutCaution,
+            TextView tvEfficacy,
+            TextView tvUsage,
+            TextView tvCaution,
+            View viewNoDetailDivider,
+            TextView tvNoDetail,
+            TextView tvTabBasic,
+            TextView tvTabCaution,
+            View viewTabBasicUnderline,
+            View viewTabCautionUnderline
+    ) {
+        pill.efficacy = mergeNonEmpty(
+                cleanHtml(item.eeDocData),
+                cleanHtml(item.mainItemIngr)
+        );
+
+        pill.usage = mergeNonEmpty(
+                cleanHtml(item.udDocData),
+                cleanHtml(item.chart),
+                cleanHtml(item.storageMethod)
+        );
+
+        pill.caution = mergeNonEmpty(
+                cleanHtml(item.pnDocData),
+                cleanHtml(item.nbDocData)
+        );
+
+        PillStorage.upsert(PillListActivity.this, pill);
+
+        applyDetailToViews(
+                pill.efficacy,
+                pill.usage,
+                pill.caution,
+                layoutTabSection,
+                layoutBasicContent,
+                layoutCautionContent,
+                layoutEfficacy,
+                layoutUsage,
+                layoutCaution,
+                tvEfficacy,
+                tvUsage,
+                tvCaution,
+                viewNoDetailDivider,
+                tvNoDetail,
+                tvTabBasic,
+                tvTabCaution,
+                viewTabBasicUnderline,
+                viewTabCautionUnderline
+        );
     }
 
     private void applyDetailToViews(
