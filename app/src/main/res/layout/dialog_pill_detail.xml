@@ -19,7 +19,7 @@
         <LinearLayout
             android:id="@+id/detailContentContainer"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="match_parent"
             android:orientation="vertical">
 
             <TextView
@@ -54,19 +54,37 @@
                 android:background="#CFC9C1"
                 android:visibility="gone" />
 
-            <TextView
-                android:id="@+id/tvNoDetail"
+            <LinearLayout
+                android:id="@+id/layoutNoDetailState"
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
                 android:layout_weight="1"
                 android:gravity="center"
-                android:lineSpacingExtra="10dp"
-                android:paddingStart="28dp"
-                android:paddingEnd="28dp"
-                android:text="이 약은 현재 상세 복약 정보가\n제공되지 않습니다.\n약국 안내 또는 제품 설명서를\n함께 확인해주세요."
-                android:textColor="#333333"
-                android:textSize="23sp"
-                android:visibility="gone" />
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <ProgressBar
+                    android:id="@+id/progressDetailLoading"
+                    style="?android:attr/progressBarStyleLarge"
+                    android:indeterminateTint="#BFB8AE"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="26dp"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/tvNoDetail"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:lineSpacingExtra="10dp"
+                    android:paddingStart="28dp"
+                    android:paddingEnd="28dp"
+                    android:text="이 약은 현재 상세 복약 정보가\n제공되지 않습니다.\n약국 안내 또는 제품 설명서를\n함께 확인해주세요."
+                    android:textColor="#333333"
+                    android:textSize="23sp"
+                    android:visibility="gone" />
+            </LinearLayout>
 
             <LinearLayout
                 android:id="@+id/layoutTabSection"

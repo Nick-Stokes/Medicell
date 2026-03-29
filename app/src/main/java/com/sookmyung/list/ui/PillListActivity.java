@@ -1,5 +1,6 @@
 package com.sookmyung.list.ui;
 
+import android.widget.ProgressBar;
 import com.sookmyung.list.detail.PermitInfoApiClient;
 import com.sookmyung.list.detail.PermitInfoEnvelope;
 import com.sookmyung.list.detail.PermitInfoService;
@@ -167,6 +168,8 @@ public class PillListActivity extends AppCompatActivity {
         TextView tvUsage = dialog.findViewById(R.id.tvUsage);
         TextView tvCaution = dialog.findViewById(R.id.tvCaution);
         View viewNoDetailDivider = dialog.findViewById(R.id.viewNoDetailDivider);
+        LinearLayout layoutNoDetailState = dialog.findViewById(R.id.layoutNoDetailState);
+        ProgressBar progressDetailLoading = dialog.findViewById(R.id.progressDetailLoading);
         TextView tvNoDetail = dialog.findViewById(R.id.tvNoDetail);
         TextView btnClose = dialog.findViewById(R.id.btnClose);
 
@@ -206,26 +209,48 @@ public class PillListActivity extends AppCompatActivity {
             dialog.getWindow().setGravity(Gravity.CENTER);
         }
 
-        applyDetailToViews(
-                pill.efficacy,
-                pill.usage,
-                pill.caution,
-                layoutTabSection,
-                layoutBasicContent,
-                layoutCautionContent,
-                layoutEfficacy,
-                layoutUsage,
-                layoutCaution,
-                tvEfficacy,
-                tvUsage,
-                tvCaution,
-                viewNoDetailDivider,
-                tvNoDetail,
-                tvTabBasic,
-                tvTabCaution,
-                viewTabBasicUnderline,
-                viewTabCautionUnderline
-        );
+        boolean hasCachedDetail =
+                !isEmpty(pill.efficacy) ||
+                        !isEmpty(pill.usage) ||
+                        !isEmpty(pill.caution);
+
+        if (hasCachedDetail) {
+            applyDetailToViews(
+                    pill.efficacy,
+                    pill.usage,
+                    pill.caution,
+                    layoutTabSection,
+                    layoutBasicContent,
+                    layoutCautionContent,
+                    layoutEfficacy,
+                    layoutUsage,
+                    layoutCaution,
+                    tvEfficacy,
+                    tvUsage,
+                    tvCaution,
+                    viewNoDetailDivider,
+                    layoutNoDetailState,
+                    progressDetailLoading,
+                    tvNoDetail,
+                    tvTabBasic,
+                    tvTabCaution,
+                    viewTabBasicUnderline,
+                    viewTabCautionUnderline
+            );
+        } else {
+            showDetailLoadingState(
+                    layoutTabSection,
+                    layoutBasicContent,
+                    layoutCautionContent,
+                    layoutEfficacy,
+                    layoutUsage,
+                    layoutCaution,
+                    viewNoDetailDivider,
+                    layoutNoDetailState,
+                    progressDetailLoading,
+                    tvNoDetail
+            );
+        }
 
         loadDrugDetail(
                 pill,
@@ -239,6 +264,8 @@ public class PillListActivity extends AppCompatActivity {
                 tvUsage,
                 tvCaution,
                 viewNoDetailDivider,
+                layoutNoDetailState,
+                progressDetailLoading,
                 tvNoDetail,
                 tvTabBasic,
                 tvTabCaution,
@@ -259,6 +286,8 @@ public class PillListActivity extends AppCompatActivity {
             TextView tvUsage,
             TextView tvCaution,
             View viewNoDetailDivider,
+            LinearLayout layoutNoDetailState,
+            ProgressBar progressDetailLoading,
             TextView tvNoDetail,
             TextView tvTabBasic,
             TextView tvTabCaution,
@@ -293,6 +322,8 @@ public class PillListActivity extends AppCompatActivity {
                                     tvUsage,
                                     tvCaution,
                                     viewNoDetailDivider,
+                                    layoutNoDetailState,
+                                    progressDetailLoading,
                                     tvNoDetail,
                                     tvTabBasic,
                                     tvTabCaution,
@@ -327,6 +358,8 @@ public class PillListActivity extends AppCompatActivity {
                                     tvUsage,
                                     tvCaution,
                                     viewNoDetailDivider,
+                                    layoutNoDetailState,
+                                    progressDetailLoading,
                                     tvNoDetail,
                                     tvTabBasic,
                                     tvTabCaution,
@@ -356,6 +389,8 @@ public class PillListActivity extends AppCompatActivity {
                                 tvUsage,
                                 tvCaution,
                                 viewNoDetailDivider,
+                                layoutNoDetailState,
+                                progressDetailLoading,
                                 tvNoDetail,
                                 tvTabBasic,
                                 tvTabCaution,
@@ -383,6 +418,8 @@ public class PillListActivity extends AppCompatActivity {
                                 tvUsage,
                                 tvCaution,
                                 viewNoDetailDivider,
+                                layoutNoDetailState,
+                                progressDetailLoading,
                                 tvNoDetail,
                                 tvTabBasic,
                                 tvTabCaution,
@@ -405,6 +442,8 @@ public class PillListActivity extends AppCompatActivity {
             TextView tvUsage,
             TextView tvCaution,
             View viewNoDetailDivider,
+            LinearLayout layoutNoDetailState,
+            ProgressBar progressDetailLoading,
             TextView tvNoDetail,
             TextView tvTabBasic,
             TextView tvTabCaution,
@@ -436,6 +475,8 @@ public class PillListActivity extends AppCompatActivity {
                             tvUsage,
                             tvCaution,
                             viewNoDetailDivider,
+                            layoutNoDetailState,
+                            progressDetailLoading,
                             tvNoDetail,
                             tvTabBasic,
                             tvTabCaution,
@@ -457,6 +498,8 @@ public class PillListActivity extends AppCompatActivity {
                         tvUsage,
                         tvCaution,
                         viewNoDetailDivider,
+                        layoutNoDetailState,
+                        progressDetailLoading,
                         tvNoDetail,
                         tvTabBasic,
                         tvTabCaution,
@@ -482,6 +525,8 @@ public class PillListActivity extends AppCompatActivity {
                         tvUsage,
                         tvCaution,
                         viewNoDetailDivider,
+                        layoutNoDetailState,
+                        progressDetailLoading,
                         tvNoDetail,
                         tvTabBasic,
                         tvTabCaution,
@@ -504,6 +549,8 @@ public class PillListActivity extends AppCompatActivity {
             TextView tvUsage,
             TextView tvCaution,
             View viewNoDetailDivider,
+            LinearLayout layoutNoDetailState,
+            ProgressBar progressDetailLoading,
             TextView tvNoDetail,
             TextView tvTabBasic,
             TextView tvTabCaution,
@@ -541,6 +588,8 @@ public class PillListActivity extends AppCompatActivity {
                             tvUsage,
                             tvCaution,
                             viewNoDetailDivider,
+                            layoutNoDetailState,
+                            progressDetailLoading,
                             tvNoDetail,
                             tvTabBasic,
                             tvTabCaution,
@@ -567,6 +616,8 @@ public class PillListActivity extends AppCompatActivity {
                             tvUsage,
                             tvCaution,
                             viewNoDetailDivider,
+                            layoutNoDetailState,
+                            progressDetailLoading,
                             tvNoDetail,
                             tvTabBasic,
                             tvTabCaution,
@@ -606,6 +657,8 @@ public class PillListActivity extends AppCompatActivity {
                                     tvUsage,
                                     tvCaution,
                                     viewNoDetailDivider,
+                                    layoutNoDetailState,
+                                    progressDetailLoading,
                                     tvNoDetail,
                                     tvTabBasic,
                                     tvTabCaution,
@@ -629,6 +682,8 @@ public class PillListActivity extends AppCompatActivity {
                                 tvUsage,
                                 tvCaution,
                                 viewNoDetailDivider,
+                                layoutNoDetailState,
+                                progressDetailLoading,
                                 tvNoDetail,
                                 tvTabBasic,
                                 tvTabCaution,
@@ -656,6 +711,8 @@ public class PillListActivity extends AppCompatActivity {
                                 tvUsage,
                                 tvCaution,
                                 viewNoDetailDivider,
+                                layoutNoDetailState,
+                                progressDetailLoading,
                                 tvNoDetail,
                                 tvTabBasic,
                                 tvTabCaution,
@@ -685,6 +742,8 @@ public class PillListActivity extends AppCompatActivity {
                         tvUsage,
                         tvCaution,
                         viewNoDetailDivider,
+                        layoutNoDetailState,
+                        progressDetailLoading,
                         tvNoDetail,
                         tvTabBasic,
                         tvTabCaution,
@@ -713,6 +772,8 @@ public class PillListActivity extends AppCompatActivity {
             TextView tvUsage,
             TextView tvCaution,
             View viewNoDetailDivider,
+            LinearLayout layoutNoDetailState,
+            ProgressBar progressDetailLoading,
             TextView tvNoDetail,
             TextView tvTabBasic,
             TextView tvTabCaution,
@@ -751,12 +812,41 @@ public class PillListActivity extends AppCompatActivity {
                 tvUsage,
                 tvCaution,
                 viewNoDetailDivider,
+                layoutNoDetailState,
+                progressDetailLoading,
                 tvNoDetail,
                 tvTabBasic,
                 tvTabCaution,
                 viewTabBasicUnderline,
                 viewTabCautionUnderline
         );
+    }
+
+    private void showDetailLoadingState(
+            LinearLayout layoutTabSection,
+            LinearLayout layoutBasicContent,
+            LinearLayout layoutCautionContent,
+            LinearLayout layoutEfficacy,
+            LinearLayout layoutUsage,
+            LinearLayout layoutCaution,
+            View viewNoDetailDivider,
+            LinearLayout layoutNoDetailState,
+            ProgressBar progressDetailLoading,
+            TextView tvNoDetail
+    ) {
+        viewNoDetailDivider.setVisibility(View.VISIBLE);
+        layoutNoDetailState.setVisibility(View.VISIBLE);
+        progressDetailLoading.setVisibility(View.VISIBLE);
+        tvNoDetail.setVisibility(View.VISIBLE);
+        tvNoDetail.setText(getString(R.string.loading_detail_message));
+
+        layoutTabSection.setVisibility(View.GONE);
+        layoutBasicContent.setVisibility(View.GONE);
+        layoutCautionContent.setVisibility(View.GONE);
+
+        layoutEfficacy.setVisibility(View.GONE);
+        layoutUsage.setVisibility(View.GONE);
+        layoutCaution.setVisibility(View.GONE);
     }
 
     private void applyDetailToViews(
@@ -773,6 +863,8 @@ public class PillListActivity extends AppCompatActivity {
             TextView tvUsage,
             TextView tvCaution,
             View viewNoDetailDivider,
+            LinearLayout layoutNoDetailState,
+            ProgressBar progressDetailLoading,
             TextView tvNoDetail,
             TextView tvTabBasic,
             TextView tvTabCaution,
@@ -785,8 +877,12 @@ public class PillListActivity extends AppCompatActivity {
 
         boolean allEmpty = noEfficacy && noUsage && noCaution;
 
+        progressDetailLoading.setVisibility(View.GONE);
+        layoutNoDetailState.setVisibility(View.GONE);
+
         if (allEmpty) {
             viewNoDetailDivider.setVisibility(View.VISIBLE);
+            layoutNoDetailState.setVisibility(View.VISIBLE);
             tvNoDetail.setVisibility(View.VISIBLE);
             tvNoDetail.setText(getString(R.string.no_detail_message));
 
@@ -801,6 +897,7 @@ public class PillListActivity extends AppCompatActivity {
         }
 
         viewNoDetailDivider.setVisibility(View.GONE);
+        layoutNoDetailState.setVisibility(View.GONE);
         tvNoDetail.setVisibility(View.GONE);
 
         layoutTabSection.setVisibility(View.VISIBLE);
