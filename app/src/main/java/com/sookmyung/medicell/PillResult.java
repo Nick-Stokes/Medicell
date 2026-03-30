@@ -22,7 +22,6 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 
-import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
@@ -57,6 +56,9 @@ public class PillResult extends AppCompatActivity {
     private String bestItemSeq;
     private String bestItemName;
 
+    private String color1 = "전체";
+    private String color2 = "전체";
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -69,37 +71,17 @@ public class PillResult extends AppCompatActivity {
         pillContentView = findViewById(R.id.pill_content);
         pillTop5View    = findViewById(R.id.pill_top5);
 
-        // ── 비트맵 로드 (메모리 우선, fallback URI) ───────
-        String uriStr = getIntent().getStringExtra("photo_uri");
+        // ── 색깔 Intent에서 받기 ──────────────────────────
+        color1 = getIntent().getStringExtra("color1");
+        color2 = getIntent().getStringExtra("color2");
+        if (color1 == null) color1 = "전체";
+        if (color2 == null) color2 = "전체";
+        Log.d(TAG, "색깔 필터: color1=" + color1 + "  color2=" + color2);
 
-        photoBitmap = PillStorage.getPendingBitmap();
-        Log.d(TAG, "★ PillStorage 비트맵: " + (photoBitmap != null
-                ? photoBitmap.getWidth() + "x" + photoBitmap.getHeight()
-                : "NULL ← URI fallback 사용"));
-        if (photoBitmap != null) {
-            Log.d(TAG, "메모리 비트맵: "
-                    + photoBitmap.getWidth() + "x"
-                    + photoBitmap.getHeight()
-                    + "  config=" + photoBitmap.getConfig());
-            pillPhotoView.setImageBitmap(photoBitmap);
-        } else if (uriStr != null) {
-            try {
-                Uri uri = Uri.parse(uriStr);
-                photoBitmap = loadBitmapFromUri(uri);
-                Log.d(TAG, "URI 비트맵: "
-                        + (photoBitmap != null
-                        ? photoBitmap.getWidth() + "x"
-                        + photoBitmap.getHeight() : "null"));
-                if (photoBitmap != null)
-                    pillPhotoView.setImageBitmap(photoBitmap);
-            } catch (Exception e) {
-                Log.e(TAG, "사진 로드 실패: " + e.getMessage(), e);
-                Toast.makeText(this, "사진 로드 실패",
-                        Toast.LENGTH_SHORT).show();
-            }
-        } else {
-            Log.e(TAG, "pendingBitmap 도 null, photo_uri 도 null");
-        }
+        // ── 모델 로딩 상태 초기화 ─────────────────────────
+        pillLabelView.setText("모델 로딩 중...");
+        pillContentView.setText("");
+        pillTop5View.setText("");
 
         // ── TTS 초기화 ────────────────────────────────────
         tts = new TextToSpeech(getApplicationContext(), status -> {
@@ -134,29 +116,50 @@ public class PillResult extends AppCompatActivity {
             });
         }
 
-        // ── 모델 로딩 → 백그라운드 ───────────────────────
-        pillLabelView.setText("모델 로딩 중...");
-        pillContentView.setText("");
-        pillTop5View.setText("");
+        // ── 비트맵 + 모델 로딩 → 백그라운드 ─────────────
+        String uriStr = getIntent().getStringExtra("photo_uri");
 
         new Thread(() -> {
             try {
+                // 비트맵 로드
+                Bitmap bmp = PillStorage.getPendingBitmap();
+                Log.d(TAG, "★ PillStorage 비트맵: " + (bmp != null
+                        ? bmp.getWidth() + "x" + bmp.getHeight()
+                        : "NULL ← URI fallback 사용"));
+
+                if (bmp == null && uriStr != null) {
+                    Uri uri = Uri.parse(uriStr);
+                    bmp = loadBitmapFromUri(uri);
+                    Log.d(TAG, "URI 비트맵: " + (bmp != null
+                            ? bmp.getWidth() + "x" + bmp.getHeight()
+                            : "null"));
+                }
+
+                final Bitmap finalBmp = bmp;
+
+                // 모델 로드
                 PillClassifier cls =
                         new PillClassifier(getApplicationContext());
                 Log.d(TAG, "PillClassifier 로드 성공");
 
                 mainHandler.post(() -> {
-                    classifier = cls;
+                    photoBitmap = finalBmp;
+                    classifier  = cls;
+
+                    if (photoBitmap != null)
+                        pillPhotoView.setImageBitmap(photoBitmap);
+
                     if (photoBitmap != null) {
                         pillLabelView.setText("분석 중...");
                         runClassificationInBackground();
                     } else {
                         pillLabelView.setText("분류 불가");
+                        Log.e(TAG, "photoBitmap null");
                     }
                 });
 
             } catch (Exception e) {
-                Log.e(TAG, "PillClassifier 로드 실패: " + e.getMessage(), e);
+                Log.e(TAG, "로드 실패: " + e.getMessage(), e);
                 mainHandler.post(() -> {
                     pillLabelView.setText("모델 로드 실패");
                     pillContentView.setText(e.getMessage());
@@ -178,7 +181,7 @@ public class PillResult extends AppCompatActivity {
 
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // URI → Bitmap (소프트웨어 렌더링 강제)
+    // URI → Bitmap
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     private Bitmap loadBitmapFromUri(Uri uri) throws Exception {
         Bitmap bmp;
@@ -196,17 +199,19 @@ public class PillResult extends AppCompatActivity {
 
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 백그라운드 추론
+    // 백그라운드 추론 (색깔 필터 포함)
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     private void runClassificationInBackground() {
         new Thread(() -> {
             try {
                 Log.d(TAG, "classify() 호출  bitmap="
                         + photoBitmap.getWidth() + "x"
-                        + photoBitmap.getHeight());
+                        + photoBitmap.getHeight()
+                        + "  color1=" + color1
+                        + "  color2=" + color2);
 
                 PillClassifier.InferenceResult inference =
-                        classifier.classify(photoBitmap);
+                        classifier.classify(photoBitmap, color1, color2);
                 Log.d(TAG, "classify() 완료");
 
                 if (inference == null
@@ -227,10 +232,9 @@ public class PillResult extends AppCompatActivity {
                         inference.top5Predictions;
                 PillClassifier.Stage1Result s1 = inference.stage1Result;
 
-                Log.d(TAG, "Top1 item_seq=" + preds.get(0).label
+                Log.d(TAG, "Top1=" + preds.get(0).label
                         + "  score=" + preds.get(0).score);
 
-                // 1위 API 조회
                 PillClassifier.Prediction best     = preds.get(0);
                 String                    bestSeq  = best.label;
                 PillInfo                  bestInfo = fetchPillInfo(bestSeq);
@@ -243,7 +247,6 @@ public class PillResult extends AppCompatActivity {
 
                 String bestDetailLocal = buildDetailText(bestInfo, best, s1);
 
-                // Top5 텍스트
                 StringBuilder top5Builder = new StringBuilder();
                 for (int i = 0; i < preds.size(); i++) {
                     PillClassifier.Prediction p    = preds.get(i);
@@ -306,21 +309,19 @@ public class PillResult extends AppCompatActivity {
                     .append(String.format("  (%.1f%%)", s1.predProb * 100))
                     .append("\n");
         }
-
+        sb.append("색깔: ").append(color1);
+        if (!"전체".equals(color2)) sb.append(" / ").append(color2);
+        sb.append("\n");
         sb.append("유사도: ")
                 .append(String.format("%.1f%%", best.score * 100))
                 .append("\n");
-
         sb.append("분류: ")
-                .append(info == null
-                        || info.className == null
+                .append(info == null || info.className == null
                         || info.className.isEmpty()
                         ? "정보 없음" : info.className)
                 .append("\n");
-
         sb.append("설명: ")
-                .append(info == null
-                        || info.chart == null
+                .append(info == null || info.chart == null
                         || info.chart.isEmpty()
                         ? "정보 없음" : info.chart);
 
@@ -336,9 +337,7 @@ public class PillResult extends AppCompatActivity {
         try {
             String urlStr = PILL_INFO_BASE
                     + "?serviceKey=" + API_KEY
-                    + "&pageNo=1"
-                    + "&numOfRows=1"
-                    + "&type=xml"
+                    + "&pageNo=1&numOfRows=1&type=xml"
                     + "&item_seq=" + URLEncoder.encode(itemSeq, "UTF-8");
 
             conn = (HttpURLConnection) new URL(urlStr).openConnection();
@@ -346,10 +345,8 @@ public class PillResult extends AppCompatActivity {
             conn.setReadTimeout(5000);
             conn.setRequestMethod("GET");
 
-            if (conn.getResponseCode() != HttpURLConnection.HTTP_OK) {
-                Log.d(TAG, "API HTTP 오류: " + conn.getResponseCode());
+            if (conn.getResponseCode() != HttpURLConnection.HTTP_OK)
                 return null;
-            }
 
             DocumentBuilder db =
                     DocumentBuilderFactory.newInstance().newDocumentBuilder();
@@ -367,22 +364,16 @@ public class PillResult extends AppCompatActivity {
             info.chart     = getTagText(item, "CHART");
             if (info.chart == null || info.chart.isEmpty())
                 info.chart = getTagText(item, "DRUG_SHAPE");
-
             return info;
 
         } catch (Exception e) {
-            Log.e(TAG, "API 조회 실패  itemSeq=" + itemSeq
-                    + "  " + e.getMessage(), e);
+            Log.e(TAG, "API 실패: " + itemSeq + " " + e.getMessage());
             return null;
         } finally {
             if (conn != null) conn.disconnect();
         }
     }
 
-
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // XML 유틸
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     private String getTagText(Element parent, String tag) {
         NodeList list = parent.getElementsByTagName(tag);
         if (list == null || list.getLength() == 0) return null;
@@ -391,30 +382,17 @@ public class PillResult extends AppCompatActivity {
         return list.item(0).getFirstChild().getNodeValue();
     }
 
-
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 데이터 클래스
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     private static class PillInfo {
-        String itemSeq;
-        String itemName;
-        String className;
-        String chart;
+        String itemSeq, itemName, className, chart;
     }
 
-
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // TTS
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     private void speakPillInfo() {
         if (tts == null) return;
-
         StringBuilder sb = new StringBuilder();
         if (spokenName   != null && !spokenName.isEmpty())
             sb.append(spokenName).append(". ");
         if (spokenDetail != null && !spokenDetail.isEmpty())
             sb.append(spokenDetail);
-
         String text = sb.toString().trim();
         if (text.isEmpty()) {
             Toast.makeText(this, "읽을 내용이 없습니다.",

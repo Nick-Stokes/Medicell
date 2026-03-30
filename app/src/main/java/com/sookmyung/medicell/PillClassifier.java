@@ -5,8 +5,6 @@ import android.content.res.AssetFileDescriptor;
 import android.graphics.Bitmap;
 import android.util.Log;
 
-import org.json.JSONArray;
-import org.json.JSONObject;
 import org.tensorflow.lite.Interpreter;
 
 import java.io.*;
@@ -31,12 +29,13 @@ public class PillClassifier {
                 put(3, "stage2_other_feat.tflite");
             }};
 
+    // ── Binary DB 파일명 ──────────────────────────────────
     private static final Map<Integer, String> DB_FILES =
             new HashMap<Integer, String>() {{
-                put(0, "circle_db.json");
-                put(1, "oval_db.json");
-                put(2, "oblong_db.json");
-                put(3, "other_db.json");
+                put(0, "circle_db_top3.bin");
+                put(1, "oval_db_top3.bin");
+                put(2, "oblong_db_top3.bin");
+                put(3, "other_db_top3.bin");
             }};
 
     private final Interpreter                     stage1Interpreter;
@@ -69,9 +68,10 @@ public class PillClassifier {
 
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 메인 추론
+    // 메인 추론 (색깔 필터 포함)
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    public InferenceResult classify(Bitmap bitmap) {
+    public InferenceResult classify(Bitmap bitmap,
+                                    String color1, String color2) {
         if (bitmap == null)
             return new InferenceResult(null, Collections.emptyList());
 
@@ -82,7 +82,6 @@ public class PillClassifier {
 
         Bitmap soft = bitmap.copy(Bitmap.Config.ARGB_8888, false);
 
-        // 중앙 픽셀 확인
         int[] px = new int[1];
         soft.getPixels(px, 0, w, w/2, h/2, 1, 1);
         Log.d(TAG, "중앙 픽셀: R=" + ((px[0]>>16)&0xFF)
@@ -111,16 +110,23 @@ public class PillClassifier {
         Stage1Result s1 = new Stage1Result(
                 shapeProbs, predShape, shapeProbs[predShape]);
 
-        List<Prediction> top5 = runRetrieval(resized, predShape);
+        List<Prediction> top5 = runRetrieval(
+                resized, predShape, color1, color2);
 
         return new InferenceResult(s1, top5);
     }
 
+    // 색깔 없이 호출 시 fallback
+    public InferenceResult classify(Bitmap bitmap) {
+        return classify(bitmap, "전체", "전체");
+    }
+
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // Retrieval
+    // Retrieval (색깔 필터 포함)
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    private List<Prediction> runRetrieval(Bitmap bmp, int shape) {
+    private List<Prediction> runRetrieval(Bitmap bmp, int shape,
+                                          String color1, String color2) {
         Interpreter   it = featInterpreters.get(shape);
         List<DbEntry> db = featureDbs.get(shape);
 
@@ -138,14 +144,30 @@ public class PillClassifier {
                 + String.format("%.4f,%.4f,%.4f,%.4f,%.4f",
                 feat[0], feat[1], feat[2], feat[3], feat[4]));
 
+        // ── 색깔 필터링 ───────────────────────────────────
+        List<DbEntry> filtered = new ArrayList<>();
+        for (DbEntry e : db) {
+            if (colorMatch(color1, color2, e.color1, e.color2))
+                filtered.add(e);
+        }
+        Log.d(TAG, "색깔 필터: " + db.size() + "→" + filtered.size()
+                + "  color1=" + color1 + "  color2=" + color2);
+
+        if (filtered.isEmpty()) {
+            Log.w(TAG, "색깔 매칭 없음 → 전체 DB 사용");
+            filtered = db;
+        }
+
+        // 유사도 계산
         List<Prediction> all = new ArrayList<>();
-        for (DbEntry entry : db) {
+        for (DbEntry entry : filtered) {
             float sim = dotProduct(feat, entry.feature);
             all.add(new Prediction(entry.itemSeq, sim, shapeName(shape)));
         }
 
         Collections.sort(all, (a, b) -> Float.compare(b.score, a.score));
 
+        // 중복 item_seq 제거 → Top-K
         List<Prediction> deduped = new ArrayList<>();
         Set<String>      seen    = new LinkedHashSet<>();
         for (Prediction p : all) {
@@ -167,7 +189,33 @@ public class PillClassifier {
 
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 전처리 (raw 0-255 전달 → 모델 내부 Rescaling이 처리)
+    // 색깔 매칭
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    private boolean colorMatch(String userColor1, String userColor2,
+                               String dbColor1,   String dbColor2) {
+        if (dbColor1   == null) dbColor1   = "";
+        if (dbColor2   == null) dbColor2   = "";
+        if (userColor1 == null) userColor1 = "전체";
+        if (userColor2 == null) userColor2 = "전체";
+
+        if (!"전체".equals(userColor1)) {
+            if (!dbColor1.contains(userColor1))
+                return false;
+        }
+
+        if ("전체".equals(userColor2)) {
+            return true;
+        } else if ("없음".equals(userColor2)) {
+            return dbColor2.isEmpty();
+        } else {
+            return dbColor2.isEmpty()
+                    || dbColor2.contains(userColor2);
+        }
+    }
+
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 전처리 (raw 0~255, 모델 내부 Rescaling 처리)
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     private ByteBuffer bitmapToInput(Bitmap bitmap) {
         ByteBuffer buf = ByteBuffer.allocateDirect(
@@ -228,28 +276,46 @@ public class PillClassifier {
                 fd.getStartOffset(), fd.getDeclaredLength());
     }
 
+    // ── Binary DB 로드 ────────────────────────────────────
     private List<DbEntry> loadFeatureDb(Context context, String file) {
         List<DbEntry> db = new ArrayList<>();
         try {
-            InputStream    is = context.getAssets().open(file);
-            BufferedReader br = new BufferedReader(
-                    new InputStreamReader(is));
-            StringBuilder  sb = new StringBuilder();
-            String line;
-            while ((line = br.readLine()) != null) sb.append(line);
-            br.close();
+            InputStream   is  = context.getAssets().open(file);
+            DataInputStream dis = new DataInputStream(
+                    new BufferedInputStream(is, 65536));
 
-            JSONArray arr = new JSONArray(sb.toString());
-            for (int i = 0; i < arr.length(); i++) {
-                JSONObject obj     = arr.getJSONObject(i);
-                String     itemSeq = obj.getString("item_seq");
-                JSONArray  featArr = obj.getJSONArray("feature");
-                float[]    feat    = new float[featArr.length()];
-                for (int j = 0; j < featArr.length(); j++)
-                    feat[j] = (float) featArr.getDouble(j);
-                db.add(new DbEntry(itemSeq, feat));
+            int count = Integer.reverseBytes(dis.readInt()); // little-endian
+            Log.d(TAG, file + " 레코드 수: " + count);
+
+            for (int i = 0; i < count; i++) {
+                // item_seq
+                int    seqLen = Integer.reverseBytes(dis.readInt());
+                byte[] seqBuf = new byte[seqLen];
+                dis.readFully(seqBuf);
+                String itemSeq = new String(seqBuf, "UTF-8");
+
+                // color1
+                int    c1Len = Integer.reverseBytes(dis.readInt());
+                byte[] c1Buf = new byte[c1Len];
+                dis.readFully(c1Buf);
+                String color1 = new String(c1Buf, "UTF-8");
+
+                // color2
+                int    c2Len = Integer.reverseBytes(dis.readInt());
+                byte[] c2Buf = new byte[c2Len];
+                dis.readFully(c2Buf);
+                String color2 = new String(c2Buf, "UTF-8");
+
+                // feature (float32 * FEAT_DIM)
+                float[] feat = new float[FEAT_DIM];
+                for (int j = 0; j < FEAT_DIM; j++) {
+                    int bits = Integer.reverseBytes(dis.readInt());
+                    feat[j] = Float.intBitsToFloat(bits);
+                }
+                db.add(new DbEntry(itemSeq, color1, color2, feat));
             }
-            Log.d(TAG, file + " 로드: " + db.size() + "개 품목");
+            dis.close();
+            Log.d(TAG, file + " 로드: " + db.size() + "개");
 
         } catch (Exception e) {
             Log.e(TAG, "DB 로드 실패: " + file + "  " + e.getMessage(), e);
@@ -263,9 +329,15 @@ public class PillClassifier {
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     public static class DbEntry {
         public final String  itemSeq;
+        public final String  color1;
+        public final String  color2;
         public final float[] feature;
-        public DbEntry(String itemSeq, float[] feature) {
+
+        public DbEntry(String itemSeq, String color1,
+                       String color2, float[] feature) {
             this.itemSeq = itemSeq;
+            this.color1  = color1 != null ? color1 : "";
+            this.color2  = color2 != null ? color2 : "";
             this.feature = feature;
         }
     }
