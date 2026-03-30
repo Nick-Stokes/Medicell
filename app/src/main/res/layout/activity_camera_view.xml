@@ -13,19 +13,84 @@
         android:layout_height="match_parent"
         android:gravity="center"
         android:orientation="vertical">
+
+        <!-- 사진 -->
         <ImageView
             android:id="@+id/iv_camera"
             android:layout_width="300dp"
             android:layout_height="300dp"
             tools:ignore="MissingConstraints" />
+
+        <!-- 색깔 선택 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingHorizontal="24dp"
+            android:paddingTop="16dp"
+            android:paddingBottom="60dp">
+
+            <!-- 색깔 1 -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:layout_marginEnd="8dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="색깔 1"
+                    android:textSize="25sp"
+                    android:textColor="@color/baseDarkgray"
+                    android:layout_marginBottom="4dp"/>
+
+                <Spinner
+                    android:id="@+id/spinner_color1"
+                    android:layout_width="match_parent"
+                    android:layout_height="50dp"
+                    android:background="@drawable/rounded_button"
+                    android:backgroundTint="@color/white"
+                    android:paddingHorizontal="8dp"/>
+            </LinearLayout>
+
+            <!-- 색깔 2 -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:layout_marginStart="8dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="색깔 2"
+                    android:textSize="25sp"
+                    android:textColor="@color/baseDarkgray"
+                    android:layout_marginBottom="4dp"/>
+
+                <Spinner
+                    android:id="@+id/spinner_color2"
+                    android:layout_width="match_parent"
+                    android:layout_height="50dp"
+                    android:background="@drawable/rounded_button"
+                    android:backgroundTint="@color/white"
+                    android:paddingHorizontal="8dp"/>
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- 버튼 -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             tools:ignore="MissingConstraints"
             android:orientation="horizontal"
             android:paddingBottom="10dp"
-            android:layout_marginTop="350dp"
+            android:paddingTop="8dp"
             android:gravity="center">
+
             <Button
                 android:id="@+id/camera_retry"
                 android:layout_width="150dp"
@@ -35,6 +100,7 @@
                 android:backgroundTint="@color/pointOrange"
                 android:textSize="20dp"
                 android:text="다시 찍기" />
+
             <Button
                 android:id="@+id/camera_next"
                 android:layout_width="150dp"
@@ -43,9 +109,7 @@
                 android:backgroundTint="@color/baseMint"
                 android:textSize="20dp"
                 android:text="인식하기" />
-
         </LinearLayout>
     </LinearLayout>
-
 
 </androidx.constraintlayout.widget.ConstraintLayout>

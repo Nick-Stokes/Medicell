@@ -51,10 +51,11 @@ public class SquareCamera extends AppCompatActivity {
     private static final float  MIN_CROP_RATIO     = 0.16f;
     private static final Size   CAPTURE_SIZE       = new Size(1280, 1280);
 
-    private PreviewView      previewView;
-    private GuideOverlayView guideOverlay;
-    private ImageCapture     imageCapture;
-    private Executor         mainExecutor;
+    private PreviewView          previewView;
+    private GuideOverlayView     guideOverlay;
+    private ImageCapture         imageCapture;
+    private Executor             mainExecutor;
+    private ProcessCameraProvider cameraProvider;  // ← 필드로 저장
 
     private long    okSinceMs   = 0L;
     private boolean isCapturing = false;
@@ -112,13 +113,24 @@ public class SquareCamera extends AppCompatActivity {
     }
 
 
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        // Activity 종료 시 카메라 해제
+        if (cameraProvider != null) {
+            cameraProvider.unbindAll();
+            cameraProvider = null;
+        }
+    }
+
+
     private void startCamera() {
         ListenableFuture<ProcessCameraProvider> future =
                 ProcessCameraProvider.getInstance(this);
 
         future.addListener(() -> {
             try {
-                ProcessCameraProvider provider = future.get();
+                cameraProvider = future.get();  // ← 필드에 저장
 
                 Preview preview = new Preview.Builder().build();
                 preview.setSurfaceProvider(previewView.getSurfaceProvider());
@@ -154,8 +166,8 @@ public class SquareCamera extends AppCompatActivity {
                     }
                 });
 
-                provider.unbindAll();
-                provider.bindToLifecycle(this,
+                cameraProvider.unbindAll();
+                cameraProvider.bindToLifecycle(this,
                         CameraSelector.DEFAULT_BACK_CAMERA,
                         preview, imageCapture, imageAnalysis);
 
@@ -186,7 +198,9 @@ public class SquareCamera extends AppCompatActivity {
             if (!stableOk) { okSinceMs = 0L; return; }
             if (isCapturing) return;
             if (okSinceMs == 0L) okSinceMs = now;
-            if (now - okSinceMs >= 350L) {
+
+            // 0.3초 → 0.1초로 변경
+            if (now - okSinceMs >= 100L) {
                 isCapturing = true;
                 okSinceMs   = 0L;
                 captureAndSendFinal224();
@@ -197,8 +211,6 @@ public class SquareCamera extends AppCompatActivity {
 
     private void captureAndSendFinal224() {
         if (imageCapture == null) {
-            Toast.makeText(this, "카메라 준비 중...",
-                    Toast.LENGTH_SHORT).show();
             isCapturing = false;
             return;
         }
@@ -227,13 +239,14 @@ public class SquareCamera extends AppCompatActivity {
                             Bitmap guideCrop = cropByGuideRegionHighRes(square);
                             Bitmap final224  = resizeBitmap(
                                     guideCrop, FINAL_INPUT_SIZE, FINAL_INPUT_SIZE);
-                            final224 = final224.copy(Bitmap.Config.ARGB_8888, false);
+                            final224 = final224.copy(
+                                    Bitmap.Config.ARGB_8888, false);
 
                             Log.d(TAG, "final224: "
                                     + final224.getWidth() + "x"
                                     + final224.getHeight());
 
-                            // 갤러리에도 저장 (Python 테스트용)
+                            // 갤러리 저장
                             try {
                                 saveToPictures(final224, "SquareCamCrop224");
                                 Log.d(TAG, "갤러리 저장 완료");
@@ -241,8 +254,13 @@ public class SquareCamera extends AppCompatActivity {
                                 Log.w(TAG, "갤러리 저장 실패: " + e.getMessage());
                             }
 
-                            // 메모리로 직접 전달
+                            // 메모리로 전달
                             PillStorage.setPendingBitmap(final224);
+
+                            // ── 카메라 해제 후 이동 ────────────────────
+                            if (cameraProvider != null) {
+                                cameraProvider.unbindAll();
+                            }
 
                             Intent i = new Intent(
                                     SquareCamera.this, CameraView.class);
@@ -251,8 +269,7 @@ public class SquareCamera extends AppCompatActivity {
 
                         } catch (Exception e) {
                             Log.e(TAG, "촬영 처리 실패", e);
-                            Toast.makeText(SquareCamera.this,
-                                    "촬영 처리 실패", Toast.LENGTH_SHORT).show();
+                            // Toast 제거 → 로그만 남김
                         } finally {
                             isCapturing = false;
                         }
@@ -261,8 +278,7 @@ public class SquareCamera extends AppCompatActivity {
                     @Override
                     public void onError(@NonNull ImageCaptureException e) {
                         Log.e(TAG, "촬영 실패", e);
-                        Toast.makeText(SquareCamera.this,
-                                "촬영 실패", Toast.LENGTH_SHORT).show();
+                        // Toast 제거 → 로그만 남김
                         isCapturing = false;
                     }
                 });
