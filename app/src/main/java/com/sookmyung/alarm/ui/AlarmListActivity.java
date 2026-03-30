@@ -1,5 +1,8 @@
 package com.sookmyung.alarm.ui;
 
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
+import android.view.Gravity;
 import android.widget.ImageButton;
 import com.sookmyung.medicell.threeButton;
 import android.widget.LinearLayout;
@@ -105,13 +108,15 @@ public class AlarmListActivity extends AppCompatActivity {
         dialog.setContentView(R.layout.dialog_add_pill_confirm);
 
         TextView tvMessage = dialog.findViewById(R.id.tvMessage);
-        TextView btnNo = dialog.findViewById(R.id.btnNo);
-        TextView btnYes = dialog.findViewById(R.id.btnYes);
+        Button btnNo = dialog.findViewById(R.id.btnNo);
+        Button btnYes = dialog.findViewById(R.id.btnYes);
 
         tvMessage.setText("알림을\n삭제하시겠습니까?");
         btnNo.setText("취소");
         btnYes.setText("삭제");
+
         btnNo.setOnClickListener(v -> dialog.dismiss());
+
         btnYes.setOnClickListener(v -> {
             AlarmScheduler.cancelGroup(this, item.groupId);
             AlarmStorage.removeByGroup(this, item.groupId);
@@ -120,9 +125,13 @@ public class AlarmListActivity extends AppCompatActivity {
         });
 
         dialog.show();
+
         if (dialog.getWindow() != null) {
-            int width = (int) (getResources().getDisplayMetrics().widthPixels * 0.92f);
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+
+            int width = (int) (getResources().getDisplayMetrics().widthPixels * 0.90f);
             dialog.getWindow().setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT);
+            dialog.getWindow().setGravity(Gravity.CENTER);
         }
     }
 }
