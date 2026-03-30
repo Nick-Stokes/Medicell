@@ -1,5 +1,9 @@
 package com.sookmyung.list.ui;
 
+import java.util.LinkedHashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.view.Gravity;
@@ -58,6 +62,8 @@ public class AddPillActivity extends AppCompatActivity {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private Runnable pendingSearch;
     private String lastQuery = "";
+    private View layoutRecommendSection;
+    private final Map<String, SearchGuide> symptomGuideMap = new LinkedHashMap<>();
 
     @Override
     protected void onCreate(Bundle b) {
@@ -70,6 +76,23 @@ public class AddPillActivity extends AppCompatActivity {
         etQuery = findViewById(R.id.etQuery);
         ImageView iv = findViewById(R.id.ivSearch);
         progressBar = findViewById(R.id.progressBar);
+        layoutRecommendSection = findViewById(R.id.layoutRecommendSection);
+
+        initSymptomGuide();
+
+        TextView chipFlu = findViewById(R.id.chipFlu);
+        TextView chipCold = findViewById(R.id.chipCold);
+        TextView chipDigest = findViewById(R.id.chipDigest);
+        TextView chipBodyache = findViewById(R.id.chipBodyache);
+        TextView chipRhinitis = findViewById(R.id.chipRhinitis);
+        TextView chipHeadache = findViewById(R.id.chipHeadache);
+
+        bindRecommendChip(chipFlu, "독감");
+        bindRecommendChip(chipCold, "감기");
+        bindRecommendChip(chipDigest, "소화");
+        bindRecommendChip(chipBodyache, "몸살");
+        bindRecommendChip(chipRhinitis, "비염");
+        bindRecommendChip(chipHeadache, "두통");
 
         rv.setLayoutManager(new LinearLayoutManager(this));
         adapter = new SearchResultAdapter(this::handlePick);
@@ -119,6 +142,8 @@ public class AddPillActivity extends AppCompatActivity {
                 cancelPendingSearch();
 
                 String query = normalize(s.toString());
+                updateRecommendVisibility(query);
+
                 if (query.isEmpty()) {
                     lastQuery = "";
                     adapter.submit(new ArrayList<>());
@@ -126,7 +151,7 @@ public class AddPillActivity extends AppCompatActivity {
                     return;
                 }
 
-                pendingSearch = () -> fetch(query, false);
+                pendingSearch = () -> searchWithGuide(query, false);
                 handler.postDelayed(pendingSearch, 300);
             }
 
@@ -139,6 +164,8 @@ public class AddPillActivity extends AppCompatActivity {
         cancelPendingSearch();
 
         String query = normalize(rawQuery);
+        updateRecommendVisibility(query);
+
         if (query.isEmpty()) {
             adapter.submit(new ArrayList<>());
             progressBar.setVisibility(View.GONE);
@@ -151,7 +178,7 @@ public class AddPillActivity extends AppCompatActivity {
             return;
         }
 
-        fetch(query, true);
+        searchWithGuide(query, true);
     }
 
     private void cancelPendingSearch() {
@@ -368,6 +395,461 @@ public class AddPillActivity extends AppCompatActivity {
     private String normalize(String text) {
         if (text == null) return "";
         return text.trim().replace(" ", "").replace("\n", "");
+    }
+
+    private void updateRecommendVisibility(String query) {
+        if (layoutRecommendSection == null) return;
+
+        if (normalize(query).isEmpty()) {
+            layoutRecommendSection.setVisibility(View.VISIBLE);
+        } else {
+            layoutRecommendSection.setVisibility(View.GONE);
+        }
+    }
+
+    private void bindRecommendChip(TextView chip, String keyword) {
+        chip.setOnClickListener(v -> {
+            etQuery.setText(keyword);
+            etQuery.setSelection(keyword.length());
+            cancelPendingSearch();
+            updateRecommendVisibility(keyword);
+            searchWithGuide(keyword, false);
+        });
+    }
+
+    private void initSymptomGuide() {
+        symptomGuideMap.clear();
+
+        symptomGuideMap.put("두통", new SearchGuide(
+                new String[]{"해열", "진통", "소염"},
+                new String[]{"타이레놀", "이부프로펜", "게보린"},
+                new String[]{"두통", "통증", "진통"}
+        ));
+
+        symptomGuideMap.put("몸살", new SearchGuide(
+                new String[]{"해열", "진통", "소염"},
+                new String[]{"타이레놀", "이부프로펜", "판피린"},
+                new String[]{"몸살", "발열", "오한", "통증"}
+        ));
+
+        symptomGuideMap.put("소화", new SearchGuide(
+                new String[]{"건위", "소화", "제산"},
+                new String[]{"훼스탈", "베아제", "겔포스"},
+                new String[]{"소화", "소화불량", "위부팽만", "속쓰림"}
+        ));
+
+        symptomGuideMap.put("비염", new SearchGuide(
+                new String[]{"항히스타민", "비염"},
+                new String[]{"지르텍", "클라리틴", "나잘스프레이"},
+                new String[]{"비염", "콧물", "재채기", "코막힘"}
+        ));
+
+        symptomGuideMap.put("독감", new SearchGuide(
+                new String[]{"해열", "진통"},
+                new String[]{"타미플루", "타이레놀", "이부프로펜"},
+                new String[]{"독감", "인플루엔자", "발열", "오한"}
+        ));
+
+        symptomGuideMap.put("감기", new SearchGuide(
+                new String[]{"해열", "진통", "소염", "항히스타민", "진해거담", "감기"},
+                new String[]{"종합감기약", "판콜", "콜대원", "타이레놀"},
+                new String[]{"감기", "기침", "콧물", "인후통", "코막힘"}
+        ));
+
+        symptomGuideMap.put("기침", new SearchGuide(
+                new String[]{"진해거담", "기침", "호흡기"},
+                new String[]{"기침", "진해거담", "콜대원", "판콜"},
+                new String[]{"기침", "가래", "인후통"}
+        ));
+
+        symptomGuideMap.put("콧물", new SearchGuide(
+                new String[]{"항히스타민", "비염"},
+                new String[]{"콧물", "지르텍", "클라리틴", "나잘스프레이"},
+                new String[]{"콧물", "재채기", "비염", "코막힘"}
+        ));
+
+        symptomGuideMap.put("코막힘", new SearchGuide(
+                new String[]{"항히스타민", "비염"},
+                new String[]{"코막힘", "지르텍", "클라리틴", "나잘스프레이"},
+                new String[]{"코막힘", "콧물", "재채기", "비염"}
+        ));
+
+        symptomGuideMap.put("인후통", new SearchGuide(
+                new String[]{"진통", "소염", "감기"},
+                new String[]{"인후통", "종합감기약", "판콜", "타이레놀"},
+                new String[]{"인후통", "목아픔", "기침", "감기"}
+        ));
+
+        symptomGuideMap.put("열", new SearchGuide(
+                new String[]{"해열", "진통"},
+                new String[]{"타이레놀", "이부프로펜", "해열"},
+                new String[]{"발열", "열", "오한"}
+        ));
+
+        symptomGuideMap.put("생리통", new SearchGuide(
+                new String[]{"진통", "소염"},
+                new String[]{"이부프로펜", "게보린", "타이레놀"},
+                new String[]{"생리통", "월경통", "통증"}
+        ));
+
+        symptomGuideMap.put("근육통", new SearchGuide(
+                new String[]{"진통", "소염"},
+                new String[]{"이부프로펜", "타이레놀", "게보린"},
+                new String[]{"근육통", "통증", "염좌통"}
+        ));
+
+        symptomGuideMap.put("치통", new SearchGuide(
+                new String[]{"진통", "소염"},
+                new String[]{"타이레놀", "이부프로펜", "게보린"},
+                new String[]{"치통", "통증", "진통"}
+        ));
+
+        symptomGuideMap.put("소화불량", new SearchGuide(
+                new String[]{"건위", "소화", "제산"},
+                new String[]{"훼스탈", "베아제", "겔포스"},
+                new String[]{"소화불량", "위부팽만", "속쓰림", "소화"}
+        ));
+
+        symptomGuideMap.put("설사", new SearchGuide(
+                new String[]{"정장", "지사"},
+                new String[]{"설사", "정장", "지사"},
+                new String[]{"설사", "묽은변", "복통"}
+        ));
+
+        symptomGuideMap.put("변비", new SearchGuide(
+                new String[]{"하제", "변비"},
+                new String[]{"마그밀", "둘코락스", "듀파락"},
+                new String[]{"변비", "배변", "장운동"}
+        ));
+
+        symptomGuideMap.put("재채기", new SearchGuide(
+                new String[]{"항히스타민", "비염"},
+                new String[]{"지르텍", "클라리틴", "나잘스프레이"},
+                new String[]{"재채기", "콧물", "비염", "코막힘"}
+        ));
+
+        symptomGuideMap.put("당뇨", new SearchGuide(
+                new String[]{"당뇨", "혈당강하"},
+                new String[]{"메트포르민", "글리메피리드", "당뇨"},
+                new String[]{"당뇨", "혈당", "제2형당뇨병"}
+        ));
+
+        symptomGuideMap.put("당뇨병", new SearchGuide(
+                new String[]{"당뇨", "혈당강하"},
+                new String[]{"메트포르민", "글리메피리드", "당뇨"},
+                new String[]{"당뇨병", "당뇨", "혈당", "제2형당뇨병"}
+        ));
+
+        symptomGuideMap.put("혈압", new SearchGuide(
+                new String[]{"혈압강하"},
+                new String[]{"암로디핀", "로사르탄", "혈압"},
+                new String[]{"고혈압", "혈압", "본태성고혈압"}
+        ));
+
+        symptomGuideMap.put("고혈압", new SearchGuide(
+                new String[]{"혈압강하"},
+                new String[]{"암로디핀", "로사르탄", "고혈압"},
+                new String[]{"고혈압", "혈압", "본태성고혈압"}
+        ));
+    }
+
+    private void searchWithGuide(String rawQuery, boolean openExactDialogIfMatched) {
+        String query = normalize(rawQuery);
+
+        if (query.isEmpty()) {
+            adapter.submit(new ArrayList<>());
+            progressBar.setVisibility(View.GONE);
+            updateRecommendVisibility(query);
+            return;
+        }
+
+        SearchGuide guide = symptomGuideMap.get(query);
+        if (guide == null) {
+            fetch(query, openExactDialogIfMatched);
+            return;
+        }
+
+        fetchByEfficacyFirst(query, guide, openExactDialogIfMatched);
+    }
+
+    private void fetchByEfficacyFirst(String symptom,
+                                      SearchGuide guide,
+                                      boolean openExactDialogIfMatched) {
+        progressBar.setVisibility(View.VISIBLE);
+
+        List<ApiEnvelope.Item> cached = PillSearchCache.get(this, symptom);
+        if (cached != null) {
+            List<ApiEnvelope.Item> efficacyMatched = filterByEfficacyClassOrName(cached, guide, symptom);
+
+            if (!efficacyMatched.isEmpty()) {
+                progressBar.setVisibility(View.GONE);
+                afterSearch(symptom, efficacyMatched, openExactDialogIfMatched);
+                return;
+            }
+
+            fetchByAssistKeywords(symptom, guide, openExactDialogIfMatched);
+            return;
+        }
+
+        api.searchPills(KEY, 1, 200, "json", symptom).enqueue(new Callback<ApiEnvelope>() {
+            @Override
+            public void onResponse(@NonNull Call<ApiEnvelope> call,
+                                   @NonNull Response<ApiEnvelope> res) {
+
+                List<ApiEnvelope.Item> fetched = filterResponseWithoutQueryMatch(res);
+                PillSearchCache.put(AddPillActivity.this, symptom, fetched);
+
+                List<ApiEnvelope.Item> efficacyMatched = filterByEfficacyClassOrName(fetched, guide, symptom);
+
+                if (!efficacyMatched.isEmpty()) {
+                    progressBar.setVisibility(View.GONE);
+                    afterSearch(symptom, efficacyMatched, openExactDialogIfMatched);
+                    return;
+                }
+
+                fetchByAssistKeywords(symptom, guide, openExactDialogIfMatched);
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<ApiEnvelope> call, @NonNull Throwable t) {
+                fetchByAssistKeywords(symptom, guide, openExactDialogIfMatched);
+            }
+        });
+    }
+
+    private void fetchByAssistKeywords(String symptom,
+                                       SearchGuide guide,
+                                       boolean openExactDialogIfMatched) {
+
+        progressBar.setVisibility(View.VISIBLE);
+
+        List<ApiEnvelope.Item> merged = new ArrayList<>();
+        Set<String> addedSeq = new HashSet<>();
+
+        fetchAssistKeywordRecursive(symptom, guide, 0, merged, addedSeq, openExactDialogIfMatched);
+    }
+
+    private void fetchAssistKeywordRecursive(String symptom,
+                                             SearchGuide guide,
+                                             int index,
+                                             List<ApiEnvelope.Item> merged,
+                                             Set<String> addedSeq,
+                                             boolean openExactDialogIfMatched) {
+
+        if (index >= guide.assistKeywords.length) {
+            progressBar.setVisibility(View.GONE);
+            List<ApiEnvelope.Item> filtered = filterByClassOrName(merged, guide, symptom);
+            afterSearch(symptom, filtered, openExactDialogIfMatched);
+            return;
+        }
+
+        String assistKeyword = normalize(guide.assistKeywords[index]);
+
+        List<ApiEnvelope.Item> cached = PillSearchCache.get(this, assistKeyword);
+        if (cached != null) {
+            mergeUniqueItems(merged, addedSeq, cached);
+            fetchAssistKeywordRecursive(symptom, guide, index + 1, merged, addedSeq, openExactDialogIfMatched);
+            return;
+        }
+
+        api.searchPills(KEY, 1, 200, "json", assistKeyword).enqueue(new Callback<ApiEnvelope>() {
+            @Override
+            public void onResponse(@NonNull Call<ApiEnvelope> call,
+                                   @NonNull Response<ApiEnvelope> res) {
+
+                List<ApiEnvelope.Item> fetched = filterResponseWithoutQueryMatch(res);
+                PillSearchCache.put(AddPillActivity.this, assistKeyword, fetched);
+                mergeUniqueItems(merged, addedSeq, fetched);
+
+                fetchAssistKeywordRecursive(symptom, guide, index + 1, merged, addedSeq, openExactDialogIfMatched);
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<ApiEnvelope> call, @NonNull Throwable t) {
+                fetchAssistKeywordRecursive(symptom, guide, index + 1, merged, addedSeq, openExactDialogIfMatched);
+            }
+        });
+    }
+
+    private List<ApiEnvelope.Item> filterResponseWithoutQueryMatch(Response<ApiEnvelope> res) {
+        List<ApiEnvelope.Item> result = new ArrayList<>();
+
+        if (res.isSuccessful()
+                && res.body() != null
+                && res.body().body != null
+                && res.body().body.items != null) {
+
+            for (ApiEnvelope.Item item : res.body().body.items) {
+                if (item != null && item.itemName != null) {
+                    result.add(item);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    private void mergeUniqueItems(List<ApiEnvelope.Item> target,
+                                  Set<String> addedSeq,
+                                  List<ApiEnvelope.Item> source) {
+        if (source == null) return;
+
+        for (ApiEnvelope.Item item : source) {
+            if (item == null || item.itemSeq == null) continue;
+
+            if (!addedSeq.contains(item.itemSeq)) {
+                addedSeq.add(item.itemSeq);
+                target.add(item);
+            }
+        }
+    }
+
+    private List<ApiEnvelope.Item> filterByEfficacyClassOrName(List<ApiEnvelope.Item> source,
+                                                               SearchGuide guide,
+                                                               String symptom) {
+        List<ApiEnvelope.Item> result = new ArrayList<>();
+
+        for (ApiEnvelope.Item item : source) {
+            if (item == null) continue;
+
+            String itemName = normalize(item.itemName);
+            String className = normalize(item.className);
+            String efficacy = normalize(item.efcyQesitm);
+
+            boolean efficacyMatched =
+                    efficacy.contains(normalize(symptom))
+                            || containsAny(efficacy, guide.efficacyKeywords);
+
+            boolean classMatched = false;
+            for (String classKeyword : guide.classKeywords) {
+                if (className.contains(normalize(classKeyword))) {
+                    classMatched = true;
+                    break;
+                }
+            }
+
+            boolean nameMatched = false;
+            for (String assistKeyword : guide.assistKeywords) {
+                if (itemName.contains(normalize(assistKeyword))) {
+                    nameMatched = true;
+                    break;
+                }
+            }
+
+            if (efficacyMatched || classMatched || nameMatched) {
+                result.add(item);
+            }
+        }
+
+        return sortSymptomResult(result, guide, symptom);
+    }
+
+    private boolean containsAny(String target, String[] keywords) {
+        if (target == null || keywords == null) return false;
+
+        for (String keyword : keywords) {
+            if (target.contains(normalize(keyword))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private List<ApiEnvelope.Item> filterByClassOrName(List<ApiEnvelope.Item> source,
+                                                       SearchGuide guide,
+                                                       String symptom) {
+        List<ApiEnvelope.Item> result = new ArrayList<>();
+
+        for (ApiEnvelope.Item item : source) {
+            if (item == null) continue;
+
+            String className = normalize(item.className);
+            String itemName = normalize(item.itemName);
+
+            boolean classMatched = false;
+            for (String classKeyword : guide.classKeywords) {
+                if (className.contains(normalize(classKeyword))) {
+                    classMatched = true;
+                    break;
+                }
+            }
+
+            boolean nameMatched = false;
+            for (String assistKeyword : guide.assistKeywords) {
+                if (itemName.contains(normalize(assistKeyword))) {
+                    nameMatched = true;
+                    break;
+                }
+            }
+
+            if (classMatched || nameMatched) {
+                result.add(item);
+            }
+        }
+
+        return sortSymptomResult(result, guide, symptom);
+    }
+
+    private List<ApiEnvelope.Item> sortSymptomResult(List<ApiEnvelope.Item> source,
+                                                     SearchGuide guide,
+                                                     String symptom) {
+        List<ApiEnvelope.Item> result = new ArrayList<>(source);
+
+        Collections.sort(result, (a, b) -> {
+            int aScore = getSymptomScore(a, guide, symptom);
+            int bScore = getSymptomScore(b, guide, symptom);
+
+            if (aScore != bScore) {
+                return Integer.compare(aScore, bScore);
+            }
+
+            String aName = normalize(a.itemName);
+            String bName = normalize(b.itemName);
+            return aName.compareTo(bName);
+        });
+
+        return result;
+    }
+
+    private int getSymptomScore(ApiEnvelope.Item item, SearchGuide guide, String symptom) {
+        String className = normalize(item.className);
+        String itemName = normalize(item.itemName);
+        String efficacy = normalize(item.efcyQesitm);
+
+        if (itemName.contains(normalize(symptom))) return 0;
+        if (efficacy.contains(normalize(symptom))) return 1;
+
+        for (String keyword : guide.efficacyKeywords) {
+            if (efficacy.contains(normalize(keyword))) {
+                return 2;
+            }
+        }
+
+        for (String assistKeyword : guide.assistKeywords) {
+            if (itemName.contains(normalize(assistKeyword))) {
+                return 3;
+            }
+        }
+
+        for (String classKeyword : guide.classKeywords) {
+            if (className.contains(normalize(classKeyword))) {
+                return 4;
+            }
+        }
+
+        return 10;
+    }
+
+    static class SearchGuide {
+        final String[] classKeywords;
+        final String[] assistKeywords;
+        final String[] efficacyKeywords;
+
+        SearchGuide(String[] classKeywords, String[] assistKeywords, String[] efficacyKeywords) {
+            this.classKeywords = classKeywords;
+            this.assistKeywords = assistKeywords;
+            this.efficacyKeywords = efficacyKeywords;
+        }
     }
 
     private boolean isAlreadyAdded(String itemSeq) {
