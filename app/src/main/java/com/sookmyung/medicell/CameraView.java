@@ -9,38 +9,36 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.MediaStore;
-import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.ImageView;
-import android.widget.Spinner;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+
+import com.google.mlkit.vision.common.InputImage;
+import com.google.mlkit.vision.text.TextRecognition;
+import com.google.mlkit.vision.text.TextRecognizer;
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions;
 
 import java.io.IOException;
 
 public class CameraView extends AppCompatActivity {
 
-    private Uri    photoUri;
-    private Bitmap displayBitmap;
-    private Handler mainHandler;
+    private static final String TAG = "CameraView";
 
-    private String selectedColor1 = "전체";
-    private String selectedColor2 = "전체";
+    private Uri       photoUri;
+    private Bitmap    displayBitmap;
+    private Handler   mainHandler;
 
-    private static final String[] COLOR_LIST = {
-            "전체",
-            "하양", "노랑", "주황", "분홍", "빨강",
-            "갈색", "연두", "초록", "청록", "파랑",
-            "남색", "자주", "보라", "회색", "검정", "투명"
-    };
+    private EditText    etPrint;
+    private CheckBox    cbApplyPrint;
+    private ImageButton btnClearPrint;
 
-    private static final String[] COLOR_LIST2 = {
-            "전체", "없음",
-            "하양", "노랑", "주황", "분홍", "빨강",
-            "갈색", "연두", "초록", "청록", "파랑",
-            "남색", "자주", "보라", "회색", "검정", "투명"
+    private static final String[] SKIP_KEYWORDS = {
+            "분할선", "마크", "없음"
     };
 
     @Override
@@ -48,76 +46,48 @@ public class CameraView extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_camera_view);
 
-        mainHandler = new Handler(Looper.getMainLooper());
+        mainHandler   = new Handler(Looper.getMainLooper());
 
         ImageView imagePreview = findViewById(R.id.iv_camera);
         Button    btnRetake    = findViewById(R.id.camera_retry);
         Button    btnNext      = findViewById(R.id.camera_next);
-        Spinner   spinner1     = findViewById(R.id.spinner_color1);
-        Spinner   spinner2     = findViewById(R.id.spinner_color2);
+        etPrint       = findViewById(R.id.etPrint);
+        cbApplyPrint  = findViewById(R.id.cbApplyPrint);
+        btnClearPrint = findViewById(R.id.btnClearPrint);
 
-        // ── Spinner 설정 ───────────────────────────────────
-        ArrayAdapter<String> adapter1 = new ArrayAdapter<>(
-                this, android.R.layout.simple_spinner_item, COLOR_LIST);
-        adapter1.setDropDownViewResource(
-                android.R.layout.simple_spinner_dropdown_item);
-        spinner1.setAdapter(adapter1);
-        spinner1.setSelection(0);
-
-        ArrayAdapter<String> adapter2 = new ArrayAdapter<>(
-                this, android.R.layout.simple_spinner_item, COLOR_LIST2);
-        adapter2.setDropDownViewResource(
-                android.R.layout.simple_spinner_dropdown_item);
-        spinner2.setAdapter(adapter2);
-        spinner2.setSelection(0);
-
-        spinner1.setOnItemSelectedListener(
-                new AdapterView.OnItemSelectedListener() {
-                    @Override
-                    public void onItemSelected(AdapterView<?> parent,
-                                               android.view.View view, int position, long id) {
-                        selectedColor1 = COLOR_LIST[position];
-                    }
-                    @Override
-                    public void onNothingSelected(AdapterView<?> parent) {}
-                });
-
-        spinner2.setOnItemSelectedListener(
-                new AdapterView.OnItemSelectedListener() {
-                    @Override
-                    public void onItemSelected(AdapterView<?> parent,
-                                               android.view.View view, int position, long id) {
-                        selectedColor2 = COLOR_LIST2[position];
-                    }
-                    @Override
-                    public void onNothingSelected(AdapterView<?> parent) {}
-                });
+        // 지우기 버튼
+        btnClearPrint.setOnClickListener(v -> {
+            etPrint.setText("");
+            cbApplyPrint.setChecked(false);
+        });
 
         // ── 비트맵 로드 ────────────────────────────────────
         Bitmap pending = PillStorage.getPendingBitmap();
 
         if (pending != null) {
-            // 메모리 비트맵 → 바로 표시
             displayBitmap = pending;
             imagePreview.setImageBitmap(displayBitmap);
             PillStorage.setPendingBitmap(displayBitmap);
+            runOcr(displayBitmap);
 
         } else {
-            // URI → 백그라운드에서 로드
             String uriStr = getIntent().getStringExtra("photo_uri");
             if (uriStr != null && !uriStr.isEmpty()) {
                 photoUri = Uri.parse(uriStr);
                 new Thread(() -> {
                     try {
                         Bitmap bmp;
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                        if (Build.VERSION.SDK_INT
+                                >= Build.VERSION_CODES.P) {
                             ImageDecoder.Source src =
                                     ImageDecoder.createSource(
-                                            getContentResolver(), photoUri);
+                                            getContentResolver(),
+                                            photoUri);
                             bmp = ImageDecoder.decodeBitmap(src,
                                     (decoder, info, source) ->
                                             decoder.setAllocator(
-                                                    ImageDecoder.ALLOCATOR_SOFTWARE));
+                                                    ImageDecoder
+                                                            .ALLOCATOR_SOFTWARE));
                         } else {
                             bmp = MediaStore.Images.Media.getBitmap(
                                     getContentResolver(), photoUri);
@@ -125,12 +95,15 @@ public class CameraView extends AppCompatActivity {
                         Bitmap finalBmp = bmp;
                         mainHandler.post(() -> {
                             displayBitmap = finalBmp;
-                            imagePreview.setImageBitmap(displayBitmap);
+                            imagePreview.setImageBitmap(
+                                    displayBitmap);
+                            runOcr(displayBitmap);
                         });
                     } catch (IOException e) {
                         e.printStackTrace();
                         mainHandler.post(() ->
-                                Toast.makeText(this, "이미지 로드 실패",
+                                Toast.makeText(this,
+                                        "이미지 로드 실패",
                                         Toast.LENGTH_SHORT).show());
                     }
                 }).start();
@@ -142,15 +115,73 @@ public class CameraView extends AppCompatActivity {
             }
         }
 
-        btnRetake.setOnClickListener(v -> finish());
+        // 다시 찍기
+        btnRetake.setOnClickListener(v -> {
+            PillStorage.setPendingBitmap(null);  // ← 추가
+            finish();
+        });
 
+        // 인식하기 → PillResultConfirm으로 이동
         btnNext.setOnClickListener(v -> {
-            Intent i = new Intent(CameraView.this, PillResult.class);
+            if (displayBitmap == null) {
+                Toast.makeText(this, "사진이 없습니다.",
+                        Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            // 각인 필터 적용 여부
+            String userPrint = "";
+            if (cbApplyPrint.isChecked()) {
+                userPrint = etPrint.getText()
+                        .toString().trim();
+            }
+
+            // PillStorage에 비트맵 저장
+            PillStorage.setPendingBitmap(displayBitmap);
+
+            Intent i = new Intent(CameraView.this,
+                    PillResultConfirm.class);
             if (photoUri != null)
                 i.putExtra("photo_uri", photoUri.toString());
-            i.putExtra("color1", selectedColor1);
-            i.putExtra("color2", selectedColor2);
+            i.putExtra("user_print", userPrint);
             startActivity(i);
         });
+    }
+
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // OCR
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    private void runOcr(Bitmap bitmap) {
+        if (bitmap == null) return;
+
+        InputImage image = InputImage.fromBitmap(bitmap, 0);
+        TextRecognizer recognizer = TextRecognition.getClient(
+                TextRecognizerOptions.DEFAULT_OPTIONS);
+
+        recognizer.process(image)
+                .addOnSuccessListener(result -> {
+                    String text = result.getText().trim();
+                    if (!text.isEmpty()) {
+                        text = cleanOcrText(text);
+                        if (!text.isEmpty()) {
+                            etPrint.setText(text);
+                            cbApplyPrint.setChecked(true);
+                        }
+                    }
+                })
+                .addOnFailureListener(e ->
+                        android.util.Log.w(TAG,
+                                "OCR 실패: " + e.getMessage()));
+    }
+
+    private String cleanOcrText(String raw) {
+        for (String kw : SKIP_KEYWORDS) {
+            raw = raw.replace(kw, "");
+        }
+        raw = raw.replace("\n", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
+        return raw;
     }
 }

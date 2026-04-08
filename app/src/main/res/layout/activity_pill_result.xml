@@ -54,14 +54,7 @@
             android:text="알약 세부 내용"
             android:textSize="15dp"
             android:backgroundTint="@color/white"/>
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:id="@+id/pill_top5"
-            android:paddingHorizontal="50dp"
-            android:paddingTop="30dp"
-            android:text="2순위부터 5순위 알약"
-            android:textSize="15dp"/>
+
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="match_parent">

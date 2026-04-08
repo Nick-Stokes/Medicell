@@ -123,6 +123,19 @@ public class SquareCamera extends AppCompatActivity {
         }
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+        isCapturing = false;
+        okSinceMs   = 0L;
+        okCount     = 0;
+        okPos       = 0;
+        stableOk    = false;
+        for (int i = 0; i < WIN; i++) okWin[i] = false;
+        guideOverlay.setOk(false);
+        startCamera();
+    }
+
 
     private void startCamera() {
         ListenableFuture<ProcessCameraProvider> future =

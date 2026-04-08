@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/main"
@@ -19,66 +20,70 @@
             android:id="@+id/iv_camera"
             android:layout_width="300dp"
             android:layout_height="300dp"
-            tools:ignore="MissingConstraints" />
+            tools:ignore="MissingConstraints"/>
 
-        <!-- 색깔 선택 -->
+        <!-- 각인 입력 (색깔 Spinner 대체) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
+            android:orientation="vertical"
             android:paddingHorizontal="24dp"
             android:paddingTop="16dp"
-            android:paddingBottom="60dp">
+            android:paddingBottom="12dp">
 
-            <!-- 색깔 1 -->
-            <LinearLayout
-                android:layout_width="0dp"
+            <TextView
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical"
-                android:layout_marginEnd="8dp">
+                android:text="각인"
+                android:textSize="25sp"
+                android:textColor="@color/baseDarkgray"
+                android:layout_marginBottom="4dp"/>
 
-                <TextView
-                    android:layout_width="wrap_content"
+            <!-- EditText + 지우기 버튼 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="50dp"
+                android:orientation="horizontal"
+                android:background="@drawable/rounded_button"
+                android:backgroundTint="@color/white"
+                android:paddingHorizontal="12dp"
+                android:gravity="center_vertical">
+
+                <EditText
+                    android:id="@+id/etPrint"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:text="색깔 1"
-                    android:textSize="25sp"
+                    android:layout_weight="1"
+                    android:hint="OCR 자동 인식 · 직접 입력 가능"
+                    android:textColorHint="#AAAAAA"
                     android:textColor="@color/baseDarkgray"
-                    android:layout_marginBottom="4dp"/>
+                    android:textSize="16sp"
+                    android:background="@android:color/transparent"
+                    android:inputType="text"
+                    android:maxLines="1"
+                    android:imeOptions="actionDone"/>
 
-                <Spinner
-                    android:id="@+id/spinner_color1"
-                    android:layout_width="match_parent"
-                    android:layout_height="50dp"
-                    android:background="@drawable/rounded_button"
-                    android:backgroundTint="@color/white"
-                    android:paddingHorizontal="8dp"/>
+                <ImageButton
+                    android:id="@+id/btnClearPrint"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:src="@android:drawable/ic_menu_close_clear_cancel"
+                    android:background="@android:color/transparent"
+                    android:alpha="0.5"/>
+
             </LinearLayout>
 
-            <!-- 색깔 2 -->
-            <LinearLayout
-                android:layout_width="0dp"
+            <!-- 각인 필터 적용 체크박스 -->
+            <CheckBox
+                android:id="@+id/cbApplyPrint"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical"
-                android:layout_marginStart="8dp">
+                android:layout_marginTop="8dp"
+                android:text="각인 필터 적용"
+                android:textSize="16sp"
+                android:textColor="@color/baseDarkgray"
+                android:checked="false"/>
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="색깔 2"
-                    android:textSize="25sp"
-                    android:textColor="@color/baseDarkgray"
-                    android:layout_marginBottom="4dp"/>
-
-                <Spinner
-                    android:id="@+id/spinner_color2"
-                    android:layout_width="match_parent"
-                    android:layout_height="50dp"
-                    android:background="@drawable/rounded_button"
-                    android:backgroundTint="@color/white"
-                    android:paddingHorizontal="8dp"/>
-            </LinearLayout>
         </LinearLayout>
 
         <!-- 버튼 -->
@@ -99,7 +104,7 @@
                 android:background="@drawable/rounded_button"
                 android:backgroundTint="@color/pointOrange"
                 android:textSize="20dp"
-                android:text="다시 찍기" />
+                android:text="다시 찍기"/>
 
             <Button
                 android:id="@+id/camera_next"
@@ -108,7 +113,8 @@
                 android:background="@drawable/rounded_button"
                 android:backgroundTint="@color/baseMint"
                 android:textSize="20dp"
-                android:text="인식하기" />
+                android:text="인식하기"/>
+
         </LinearLayout>
     </LinearLayout>
 

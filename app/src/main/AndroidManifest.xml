@@ -7,7 +7,6 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-
     <uses-permission
         android:name="android.permission.CAMERA"
         tools:ignore="PermissionImpliesUnsupportedChromeOsHardware" />
@@ -25,18 +24,17 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Medicell">
-
+        <activity
+            android:name=".PillResultConfirm"
+            android:exported="false" />
         <activity
             android:name=".TabooCheck"
             android:exported="false" />
-
         <activity
             android:name=".PillResult"
             android:exported="false" />
-
         <activity android:name="com.sookmyung.list.ui.PillListActivity" />
         <activity android:name="com.sookmyung.list.ui.AddPillActivity" />
-
         <activity android:name="com.sookmyung.alarm.ui.AlarmListActivity" />
         <activity android:name="com.sookmyung.alarm.ui.AddAlarmActivity" />
         <activity android:name="com.sookmyung.alarm.ui.TodayMedicineActivity" />
@@ -44,7 +42,6 @@
         <receiver
             android:name="com.sookmyung.alarm.AlarmReceiver"
             android:exported="false" />
-
         <receiver
             android:name="com.sookmyung.alarm.BootReceiver"
             android:enabled="true"
@@ -60,21 +57,19 @@
         <activity
             android:name=".SquareCamera"
             android:exported="false" />
-
         <activity
             android:name=".CameraView"
             android:exported="false" />
-
         <activity
             android:name=".threeButton"
             android:exported="false" />
-
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:theme="@style/Theme.Medicell">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
+
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>

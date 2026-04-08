@@ -79,6 +79,8 @@ android {
 dependencies {
     val camerax_version = "1.3.4"
 
+    implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.0")
+
     implementation("androidx.camera:camera-core:$camerax_version")
     implementation("androidx.camera:camera-camera2:$camerax_version")
     implementation("androidx.camera:camera-lifecycle:$camerax_version")

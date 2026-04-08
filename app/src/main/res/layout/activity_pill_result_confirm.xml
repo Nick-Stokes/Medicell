@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/main"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".PillResultConfirm">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="24dp">
+
+        <!-- 상단 안내 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="이 알약이 맞습니까?"
+            android:textSize="22sp"
+            android:textColor="@color/baseDarkgray"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp"/>
+
+        <!-- 순위 표시 -->
+        <TextView
+            android:id="@+id/tvRank"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="1 / 5"
+            android:textSize="16sp"
+            android:textColor="@color/baseDarkgray"
+            android:layout_marginBottom="20dp"/>
+
+        <!-- 알약 이미지 -->
+        <ImageView
+            android:id="@+id/ivPillImage"
+            android:layout_width="240dp"
+            android:layout_height="180dp"
+            android:scaleType="fitCenter"
+            android:adjustViewBounds="true"
+            android:background="@drawable/rounded_button"
+            android:backgroundTint="@color/white"
+            android:layout_marginBottom="16dp"/>
+
+        <!-- 약 이름 -->
+        <TextView
+            android:id="@+id/tvPillName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="약 이름"
+            android:textSize="20sp"
+            android:textColor="@color/baseDarkgray"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:layout_marginBottom="6dp"/>
+
+        <!-- 유사도 -->
+        <TextView
+            android:id="@+id/tvScore"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="유사도 00.0%"
+            android:textSize="14sp"
+            android:textColor="@color/baseDarkgray"
+            android:layout_marginBottom="28dp"/>
+
+        <!-- 버튼 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center">
+
+            <Button
+                android:id="@+id/btnNext"
+                android:layout_width="150dp"
+                android:layout_height="50dp"
+                android:layout_marginEnd="10dp"
+                android:background="@drawable/rounded_button"
+                android:backgroundTint="@color/pointOrange"
+                android:text="아니에요"
+                android:textSize="18sp"/>
+
+            <Button
+                android:id="@+id/btnConfirm"
+                android:layout_width="150dp"
+                android:layout_height="50dp"
+                android:background="@drawable/rounded_button"
+                android:backgroundTint="@color/baseMint"
+                android:text="맞아요!"
+                android:textSize="18sp"/>
+
+        </LinearLayout>
+
+        <!-- 5개 다 아닐 때 -->
+        <Button
+            android:id="@+id/btnNone"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@android:color/transparent"
+            android:text="해당 없음"
+            android:textColor="@color/baseDarkgray"
+            android:textSize="14sp"
+            android:visibility="gone"/>
+
+    </LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>
